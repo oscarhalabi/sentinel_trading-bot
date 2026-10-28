@@ -93,6 +93,15 @@ Un único archivo (p. ej. `bot/engines.py` o un `engines.json` que también lea 
 
 El `bot_id` del motor nuevo debe ser **distinto** de `m15`, `m5` y del que use e2 en Supabase, para que sus filas nunca se mezclen. *(Llamada de Claude: nombre provisional `n1`; Oscar puede renombrarlo antes de la primera migración.)*
 
+**Varios motores nuevos, no uno solo (pedido de Oscar).** Es probable que terminen existiendo varios bots separados (scalping, intradía, swing, uno por par/símbolo, uno por régimen, uno de cobertura, etc.). La infraestructura de Fase 1 no debe asumir un único motor nuevo:
+- El registro admite N motores; cada uno con su `bot_id`, su magic, su módulo y su fila de `engine_config`. Agregar uno no requiere tocar lanzador, provisionador, vigilante ni app web.
+- Una misma cuenta puede correr varios motores a la vez (como hoy M15+M5), y cada `.env` declara cuáles en `BOTS=`.
+- El símbolo deja de ser uno fijo por instancia: cada motor declara el/los símbolos que opera (el `SYMBOL=` del `.env` queda como valor por defecto).
+- La app web lista y controla cualquier cantidad de motores por usuario (encendido/apagado y cierre forzado por motor; métricas de cuenta agregadas).
+- Cuando varios motores comparten cuenta, comparten margen y riesgo. En Fase 1 solo se deja el **punto de enchufe** para un guardián de riesgo a nivel de cuenta (que pueda vetar aperturas de cualquier motor); sus reglas se diseñan en Fases 3–5.
+- El esqueleto de Fase 1 se prueba con **dos** motores nulos en la misma cuenta demo, para demostrar que conviven sin mezclarse.
+- Los nombres concretos de cada motor se deciden cuando la investigación diga cuáles valen la pena; `n1` es solo el primero.
+
 **Compatibilidad para el reemplazo:** el formato del `.env` se mantiene (mismas claves de Supabase, identidad, MT5, Resend, `SHADOW_MODE`, `BOTS=`); el motor nuevo añade su propia clave de magic (p. ej. `MAGIC_N1`). Cuando llegue el PR al original, el registro de allá podrá contener los motores viejos y el nuevo a la vez, y pasar un usuario de uno a otro es cambiar `BOTS=` en su `.env` (y la fila correspondiente en `bot_instances`). Volver atrás es lo mismo al revés.
 
 ### 7.3 Aislamiento del bot de producción en el mismo VPS
@@ -159,7 +168,7 @@ Una clase que cumple la interfaz de `bot/main.py` (sección 2) y **no envía ór
 
 ## 8. Cómo se sabe que la Fase 1 está lista
 
-1. El repo no contiene código de la estrategia vieja; arranca con el motor esqueleto en una cuenta demo propia, en modo normal y `-Lite`.
+1. El repo no contiene código de la estrategia vieja; arranca con dos motores esqueleto en la misma cuenta demo propia, en modo normal y `-Lite`, sin que se mezclen sus posiciones, logs ni estado.
 2. Desde la app web, el bot nuevo aparece como un motor más: encender/apagar, cierre forzado y meta funcionan; heartbeat y estado se ven.
 3. Mientras tanto, producción (e2) sigue corriendo sin interrupción: los 3 terminales y 6 procesos no se reinician, y `restart_all.ps1 -DryRun` de este repo lista cero procesos de producción.
 4. Las migraciones nuevas son solo aditivas y están revisadas por Daniel.
