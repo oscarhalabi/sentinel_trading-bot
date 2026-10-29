@@ -107,7 +107,7 @@ class Broker:
 
         Base de la coordinacion entre bots: cada proceso ve la cesta del otro
         leyendo directamente de MT5 (fuente de verdad, latencia cero) en vez de
-        pasar por la DB. Ver bot/budget.py.
+        pasar por la DB.
         """
         pos = mt5.positions_get(symbol=self.symbol)
         return list(pos) if pos else []

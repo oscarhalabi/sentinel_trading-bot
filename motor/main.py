@@ -22,7 +22,6 @@ from . import config, notify
 from .broker import Broker
 from .db import Database
 from .logger import Logger
-from .strategy import SentinelEngine
 
 
 def disable_quickedit():
@@ -63,10 +62,10 @@ def setup(logger=None, engine_cls=None):
     """Inicializa MT5, DB, broker y motor. Devuelve (db, broker, engine, logger).
 
     `engine_cls` permite reusar todo el arranque con otro motor (M5Engine) sin
-    duplicar la conexion, la DB ni el bucle. Por defecto, el Sentinel M15.
+    duplicar la conexion, la DB ni el bucle. Es obligatorio.
     """
     if engine_cls is None:
-        engine_cls = SentinelEngine
+        raise ValueError("setup() necesita engine_cls: no hay motor por defecto.")
 
     # Antes de tocar MT5 o la DB: si BOT_ID y MAGIC_NUMBER no se corresponden,
     # los dos motores se verian las posiciones mutuamente. Aborta el arranque.
