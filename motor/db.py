@@ -59,13 +59,17 @@ class Database:
     # Config de estrategia (bot_config)
     # ==============================================================
     def load_config(self):
-        """Devuelve (config_dict, status). Ante fallo de red reusa la cache."""
+        """Devuelve (config_dict, status). Ante fallo de red reusa la cache.
+
+        Lee la tabla engine_config (una fila por usuario y motor; no tiene
+        columna symbol). El dict trae la fila entera y "params" siempre es un
+        dict. Si hay fila activa el status es "ACTIVE".
+        """
         try:
             res = (
-                self.client.table("bot_config")
+                self.client.table("engine_config")
                 .select("*")
                 .eq("user_id", config.USER_ID)
-                .eq("symbol", config.SYMBOL)
                 .eq("bot_id", config.BOT_ID)
                 .eq("is_active", True)
                 .limit(1)
@@ -73,8 +77,11 @@ class Database:
             )
             rows = res.data or []
             if rows:
-                self._cfg_cache = dict(rows[0])
-                return self._cfg_cache, rows[0].get("status", "INACTIVE")
+                fila = dict(rows[0])
+                fila["params"] = fila.get("params") or {}
+                fila["status"] = "ACTIVE"
+                self._cfg_cache = fila
+                return self._cfg_cache, "ACTIVE"
             # No hay fila activa: no pisar la cache; reportar INACTIVE.
             return (self._cfg_cache or {}), "INACTIVE"
         except Exception:  # noqa: BLE001  (hipo de red no debe tumbar el motor)
