@@ -7,11 +7,13 @@ pero NO se envian al broker.
 """
 
 import datetime
+import re
 from types import SimpleNamespace
 
 import MetaTrader5 as mt5
 
 from . import config
+from .risk import AccountRiskGuard
 
 # Traduccion de los retcodes que mas cuesta diagnosticar leyendo solo el numero.
 _RETCODE_AYUDA = {
@@ -31,8 +33,13 @@ _RETCODE_AYUDA = {
 
 
 class Broker:
-    def __init__(self, logger, shadow=False):
-        self.symbol = config.SYMBOL
+    def __init__(self, logger, shadow=False, risk_guard: AccountRiskGuard | None = None,
+                 symbols: tuple[str, ...] | None = None):
+        # `symbols`: todos los simbolos que opera el bot (para ver sus posiciones).
+        # `self.symbol` es el principal: lo usan los helpers de un solo simbolo.
+        self.symbols = tuple(symbols) if symbols else (config.SYMBOL,)
+        self.symbol = self.symbols[0]
+        self.risk_guard = risk_guard or AccountRiskGuard()
         self.magic = config.MAGIC_NUMBER
         self.logger = logger
         self.shadow = shadow
@@ -103,14 +110,18 @@ class Broker:
         return self.positions_of_magic(self.magic)
 
     def positions_all(self):
-        """TODAS las posiciones del simbolo, sin filtrar por magic.
+        """TODAS las posiciones de los simbolos del bot, sin filtrar por magic.
 
         Base de la coordinacion entre bots: cada proceso ve la cesta del otro
         leyendo directamente de MT5 (fuente de verdad, latencia cero) en vez de
         pasar por la DB.
         """
-        pos = mt5.positions_get(symbol=self.symbol)
-        return list(pos) if pos else []
+        todas = []
+        for sym in self.symbols:
+            pos = mt5.positions_get(symbol=sym)
+            if pos:
+                todas.extend(pos)
+        return todas
 
     def positions_of_magic(self, magic):
         """Posiciones del simbolo pertenecientes a un magic concreto."""
@@ -226,22 +237,16 @@ class Broker:
     # --------------------------------------------------------------
     @staticmethod
     def _open_log_type(comment):
-        """Mapea el comment de apertura a un log_type analizable en bot_logs."""
+        """Etiqueta de la operacion a partir del comment "TAG|texto".
+
+        Devuelve TAG en mayusculas, solo [A-Z0-9_] y de hasta 20 caracteres.
+        Si el comment no tiene esa forma (o la etiqueta queda vacia), "OPERACION".
+        """
         c = comment or ""
-        # "Grinder ..." es el prefijo historico del scalper embebido en el
-        # Sentinel (ya extraido); "M5 ..." es el del motor M5 actual. Se
-        # conservan ambos para que el histórico de bot_logs siga clasificando.
-        if c.startswith("Grinder") or c.startswith("M5 "):
-            return "GRINDER"
-        if c.startswith("Hedge"):
-            return "PROTECCION"
-        if c.startswith("Recovery"):
-            return "RECOVERY"
-        if c.startswith("Sentinel Op 4"):
-            return "RESCATE"
-        if c.startswith("SMC"):
-            return "ENTRADA"
-        return "OPERACION"
+        if "|" not in c:
+            return "OPERACION"
+        tag = re.sub(r"[^A-Z0-9_]", "", c.split("|", 1)[0].upper())[:20]
+        return tag or "OPERACION"
 
     def _log_open(self, res, order_type, lots, price, comment):
         """Loguea el resultado de una apertura: evento con ticket si fue aceptada,
@@ -276,14 +281,24 @@ class Broker:
                                    f"{_RETCODE_AYUDA.get(rc, '')}".strip(),
                           price, lots, bal, ticket=ticket)
 
-    def market_order(self, order_type, lots, comment, sl=0.0, tp=0.0):
+    def market_order(self, order_type, lots, comment, sl=0.0, tp=0.0, symbol=None):
         """Abre a mercado. `sl`/`tp` en PRECIO (0 = sin stop), como MQL5.
 
         El Sentinel M15 abre siempre sin SL (su red es el Hedge Lock); el motor
         M5 abre con SL por ATR desde el primer tick.
         """
+        symbol = symbol or self.symbol
         if self.shadow:
             self.logger.write("SHADOW", f"ORDER {('BUY' if order_type==mt5.ORDER_TYPE_BUY else 'SELL')} {comment}", 0, lots)
+            return None
+
+        # Guardian de riesgo de la cuenta: puede vetar la apertura.
+        side = "BUY" if order_type == mt5.ORDER_TYPE_BUY else "SELL"
+        permitido, motivo_riesgo = self.risk_guard.allow_open(
+            bot_id=config.BOT_ID, symbol=symbol, side=side, lots=lots)
+        if not permitido:
+            self.logger.write("BLOQUEO", f"Apertura {side} {symbol} vetada por riesgo: {motivo_riesgo}",
+                              0, lots, self.account_balance())
             return None
 
         # Puerta previa: si el terminal o la cuenta no permiten operar, no se
@@ -294,10 +309,11 @@ class Broker:
         if not allowed:
             return SimpleNamespace(retcode=mt5.TRADE_RETCODE_CLIENT_DISABLES_AT, order=0)
 
-        price = self.ask() if order_type == mt5.ORDER_TYPE_BUY else self.bid()
+        tick = mt5.symbol_info_tick(symbol)
+        price = tick.ask if order_type == mt5.ORDER_TYPE_BUY else tick.bid
         request = {
             "action": mt5.TRADE_ACTION_DEAL,
-            "symbol": self.symbol,
+            "symbol": symbol,
             "volume": float(lots),
             "type": order_type,
             "price": price,

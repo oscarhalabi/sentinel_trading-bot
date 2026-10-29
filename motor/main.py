@@ -86,7 +86,7 @@ def setup(logger=None, engine_cls=None):
 
     logger.add_sink(db.log_sink)  # encola cada write() -> bot_logs (no bloquea; sin pisar otros sinks)
 
-    broker = Broker(logger, shadow=config.SHADOW_MODE)
+    broker = Broker(logger, shadow=config.SHADOW_MODE, symbols=symbols)
     engine = engine_cls(broker, logger)
     engine.symbols = symbols
     engine.init_history_cursor()
@@ -204,7 +204,7 @@ def _open_position_row(p):
     """Fila OPEN para bot_positions a partir de una posicion live de MT5."""
     return {
         "ticket": p.ticket,
-        "symbol": config.SYMBOL,
+        "symbol": p.symbol,
         "position_type": "BUY" if p.type == mt5.POSITION_TYPE_BUY else "SELL",
         "op_type": Broker._open_log_type(p.comment),
         "comment": p.comment,
