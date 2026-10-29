@@ -15,6 +15,7 @@ pueda reutilizar el mismo motor en un hilo aparte sin duplicar logica.
 import ctypes
 import datetime
 import os
+import sys
 import time
 
 import MetaTrader5 as mt5
@@ -155,6 +156,12 @@ def setup(logger=None, engine_cls=None):
         logger.write("SYSTEM", "MODO SOMBRA activo: no se enviaran ordenes reales; solo se loguean decisiones.")
 
     return db, broker, engine, logger
+
+
+def _reseleccionar_simbolos(engine):
+    """Tras reconectar MT5, vuelve a seleccionar los simbolos en Market Watch."""
+    for sym in getattr(engine, "symbols", []) or []:
+        mt5.symbol_select(sym, True)
 
 
 def _bot_status(engine):
@@ -370,8 +377,10 @@ def trading_loop(db, engine, logger, stop_event=None):
     cfg = {}
     known_open_tickets = set()  # ultimo set de tickets OPEN reportado a bot_positions
     watch = Mt5Watch(config.mt5_init_kwargs(), logger,
-                     fail_threshold=config.MT5_FAIL_THRESHOLD, giveup_s=config.MT5_GIVEUP_S)
+                     fail_threshold=config.MT5_FAIL_THRESHOLD, giveup_s=config.MT5_GIVEUP_S,
+                     on_reconnect=lambda: _reseleccionar_simbolos(engine))
     mt5_estado = "OK"  # ultimo veredicto del vigilante (se actualiza en cada heartbeat)
+    aviso_force_close = False  # ya se aviso (en este episodio) que el cierre forzado espera
 
     def running():
         return stop_event is None or not stop_event.is_set()
@@ -379,6 +388,16 @@ def trading_loop(db, engine, logger, stop_event=None):
     while running():
         try:
             now = time.time()
+
+            # Vigilante de MT5: una vez por heartbeat, ANTES de operar.
+            if now - last_report >= config.HEARTBEAT_INTERVAL:
+                mt5_estado = watch.check()
+                if mt5_estado == "GIVE_UP":
+                    # SystemExit no lo atrapa el `except Exception` de abajo; los
+                    # llamadores (run/lite/tui) cierran en su `finally`.
+                    logger.write("ERROR", "MT5 no volvio: salgo con codigo 3 para que el "
+                                          "vigilante relance el motor.")
+                    raise SystemExit(3)
 
             # Refresco de control (config + instancia) desacoplado del on_tick.
             if now - last_refresh >= config.CONTROL_REFRESH:
@@ -395,7 +414,16 @@ def trading_loop(db, engine, logger, stop_event=None):
                 # si el terminal rechaza ordenes (AutoTrading off, requote...)
                 # close_all devuelve False y se reintenta en el proximo refresh
                 # (~3 s) hasta lograrlo, logueando el retcode de cada rechazo.
-                if inst.get("force_close"):
+                if inst.get("force_close") and mt5_estado != "OK":
+                    # Sin MT5 positions() devuelve [] y close_all creeria que ya
+                    # esta plano: se consumiria la orden sin cerrar nada. Se deja
+                    # la bandera puesta hasta que vuelva el terminal.
+                    if not aviso_force_close:
+                        logger.write("SYSTEM", "CIERRE FORZADO en espera: MT5 no responde; "
+                                               "se ejecuta en cuanto vuelva el terminal.")
+                        aviso_force_close = True
+                elif inst.get("force_close"):
+                    aviso_force_close = False
                     logger.write("SYSTEM", "CIERRE FORZADO solicitado por el usuario: "
                                            "cerrando todas las posiciones de esta instancia.")
                     allowed, motivo = engine.b.trade_allowed()
@@ -409,16 +437,6 @@ def trading_loop(db, engine, logger, stop_event=None):
                     engine.is_active = False
                     engine.close_only = True
 
-            # Vigilante de MT5: una vez por heartbeat, ANTES de operar.
-            if now - last_report >= config.HEARTBEAT_INTERVAL:
-                mt5_estado = watch.check()
-                if mt5_estado == "GIVE_UP":
-                    # SystemExit no lo atrapa el `except Exception` de abajo; los
-                    # llamadores (run/lite/tui) cierran en su `finally`.
-                    logger.write("ERROR", "MT5 no volvio: salgo con codigo 3 para que el "
-                                          "vigilante relance el motor.")
-                    raise SystemExit(3)
-
             # Sin config no hay nada que gestionar, pero el heartbeat y el
             # reporte siguen: la instancia debe verse viva en el dashboard.
             # Con MT5 caido o reconectando tampoco se opera (el heartbeat sigue).
@@ -427,72 +445,75 @@ def trading_loop(db, engine, logger, stop_event=None):
 
             # Heartbeat + estado observacional.
             if now - last_report >= config.HEARTBEAT_INTERVAL:
-                status = _bot_status(engine)
+                status = _bot_status(engine) if mt5_estado == "OK" else "MT5_DOWN"
                 db.report(status)
                 if status != last_reported:
                     logger.write("SYSTEM", f"Estado del bot: {status}.")
                     last_reported = status
 
-                # Snapshot en vivo para el dashboard (bot_state). Best-effort;
-                # nunca debe tumbar el bucle si Supabase/MT5 fallan.
-                # Gate de comision: con una comision de retiro PENDIENTE la
-                # instancia no opera. Si el usuario (o cualquiera) pone
-                # is_active=true en la DB con deuda viva, el bot lo revierte a
-                # close-only. El desbloqueo llega solo cuando el pago USDT se
-                # verifica on-chain (status=PAID) desde el dashboard.
-                try:
-                    if engine.is_active and db.has_pending_commission():
-                        db.deactivate_all_instances()
-                        engine.is_active = False
-                        engine.close_only = True
-                        logger.write("SYSTEM", "Comision de retiro PENDIENTE: instancia en "
-                                               "solo-cierre hasta verificar el pago en el dashboard.")
-                except Exception:  # noqa: BLE001
-                    pass
+                # Sin MT5 solo sale el latido: nada de snapshot, velas ni sync de
+                # posiciones (positions() vacio las marcaria todas como CERRADAS).
+                if mt5_estado == "OK":
+                    # Snapshot en vivo para el dashboard (bot_state). Best-effort;
+                    # nunca debe tumbar el bucle si Supabase/MT5 fallan.
+                    # Gate de comision: con una comision de retiro PENDIENTE la
+                    # instancia no opera. Si el usuario (o cualquiera) pone
+                    # is_active=true en la DB con deuda viva, el bot lo revierte a
+                    # close-only. El desbloqueo llega solo cuando el pago USDT se
+                    # verifica on-chain (status=PAID) desde el dashboard.
+                    try:
+                        if engine.is_active and db.has_pending_commission():
+                            db.deactivate_all_instances()
+                            engine.is_active = False
+                            engine.close_only = True
+                            logger.write("SYSTEM", "Comision de retiro PENDIENTE: instancia en "
+                                                   "solo-cierre hasta verificar el pago en el dashboard.")
+                    except Exception:  # noqa: BLE001
+                        pass
 
-                try:
-                    _reconcile_capital_flows(engine, logger)
-                except Exception:  # noqa: BLE001
-                    pass
-                try:
-                    info = mt5.account_info()
-                    if info:
-                        # account_settings se lee UNA vez por heartbeat y
-                        # alimenta el reinicio de base y el chequeo de meta.
-                        acct = db.get_account_settings()
-                        _apply_baseline_reset(engine, logger, acct, info)
-                        db.report_state(
-                            symbol=config.SYMBOL,
-                            balance=info.balance,
-                            equity=info.equity,
-                            margin_used=info.margin,
-                            margin_free=info.margin_free,
-                            floating_pnl=info.equity - info.balance,
-                            open_positions=len(engine.b.positions()),
-                            initial_balance=engine.initial_balance,
-                            last_flow_ticket=engine.last_flow_ticket,
-                            baseline_applied_at=engine.baseline_applied_at,
-                        )
-                        _check_profit_target(db, engine, logger, info, acct)
-                except Exception:  # noqa: BLE001
-                    pass
+                    try:
+                        _reconcile_capital_flows(engine, logger)
+                    except Exception:  # noqa: BLE001
+                        pass
+                    try:
+                        info = mt5.account_info()
+                        if info:
+                            # account_settings se lee UNA vez por heartbeat y
+                            # alimenta el reinicio de base y el chequeo de meta.
+                            acct = db.get_account_settings()
+                            _apply_baseline_reset(engine, logger, acct, info)
+                            db.report_state(
+                                symbol=config.SYMBOL,
+                                balance=info.balance,
+                                equity=info.equity,
+                                margin_used=info.margin,
+                                margin_free=info.margin_free,
+                                floating_pnl=info.equity - info.balance,
+                                open_positions=len(engine.b.positions()),
+                                initial_balance=engine.initial_balance,
+                                last_flow_ticket=engine.last_flow_ticket,
+                                baseline_applied_at=engine.baseline_applied_at,
+                            )
+                            _check_profit_target(db, engine, logger, info, acct)
+                    except Exception:  # noqa: BLE001
+                        pass
 
-                # Velas para la grafica (la en formacion + la previa).
-                _publish_candles(db, CANDLES_HEARTBEAT)
+                    # Velas para la grafica (la en formacion + la previa).
+                    _publish_candles(db, CANDLES_HEARTBEAT)
 
-                # Posiciones para el dashboard (bot_positions): upsert de las
-                # abiertas + cierre de las que desaparecieron desde el ultimo
-                # heartbeat. Best-effort; nunca debe tumbar el bucle.
-                try:
-                    live_positions = engine.b.positions()
-                    current_tickets = {p.ticket for p in live_positions}
-                    closed_tickets = known_open_tickets - current_tickets
-                    rows = [_open_position_row(p) for p in live_positions]
-                    rows += [_closed_position_row(engine.b, t) for t in closed_tickets]
-                    db.upsert_positions(rows)
-                    known_open_tickets = current_tickets
-                except Exception:  # noqa: BLE001
-                    pass
+                    # Posiciones para el dashboard (bot_positions): upsert de las
+                    # abiertas + cierre de las que desaparecieron desde el ultimo
+                    # heartbeat. Best-effort; nunca debe tumbar el bucle.
+                    try:
+                        live_positions = engine.b.positions()
+                        current_tickets = {p.ticket for p in live_positions}
+                        closed_tickets = known_open_tickets - current_tickets
+                        rows = [_open_position_row(p) for p in live_positions]
+                        rows += [_closed_position_row(engine.b, t) for t in closed_tickets]
+                        db.upsert_positions(rows)
+                        known_open_tickets = current_tickets
+                    except Exception:  # noqa: BLE001
+                        pass
 
                 last_report = now
 
@@ -513,6 +534,13 @@ def shutdown(db, localdb=None):
     mt5.shutdown()
 
 
+def _motivo_salida():
+    """Texto del log de cierre: distingue la salida por MT5 caido de un Ctrl+C."""
+    if isinstance(sys.exc_info()[1], SystemExit):
+        return "Salida por MT5 caido (el vigilante relanzara el motor)."
+    return "Detencion manual solicitada."
+
+
 def run(engine_cls=None):
     disable_quickedit()
     db, broker, engine, logger = setup(engine_cls=engine_cls)
@@ -521,6 +549,6 @@ def run(engine_cls=None):
     except KeyboardInterrupt:
         pass
     finally:
-        logger.write("SYSTEM", "Detencion manual solicitada.")
+        logger.write("SYSTEM", _motivo_salida())
         shutdown(db, engine.localdb)
 

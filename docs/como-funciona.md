@@ -19,7 +19,8 @@ Explicado sin jerga. Para el plan de convivencia con producción ve a
   frecuencia. En Fase 1 solo registra eventos del motor (tabla `engine_events`).
 - **El vigilante** (tarea programada `SentinelN1Vigilante`): cada 3 minutos mira qué motores
   deberían estar vivos y relanza los que falten. Además, cada motor reconecta MT5 por sí solo
-  si el terminal deja de responder (y si no lo logra en 5 minutos, sale para que lo relance el vigilante).
+  si el terminal deja de responder (y si no lo logra en unos 5 minutos, sale para que lo relance el vigilante).
+  Mientras MT5 no responde, el motor no opera y reporta `bot_status = MT5_DOWN` (la app web puede mostrarlo).
 - **El servidor (VPS)**: el Windows donde corre todo, incluido el bot de producción (e2),
   que **no** es parte de este repo.
 

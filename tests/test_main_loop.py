@@ -165,3 +165,62 @@ def test_render_params_generico():
     assert panel is not None
     vacio = tui.render_params({})
     assert vacio is not None
+
+
+def test_force_close_espera_si_mt5_caido(monkeypatch):
+    _entorno(monkeypatch)
+    _watch(monkeypatch, "RECONNECTING", "RECONNECTING", "OK")
+    db = _doble_db({}, instancias=[{"force_close": True}] * 3)
+    engine = _doble_engine(close_all=[True])
+    logger = MagicMock()
+    botmain.trading_loop(db, engine, logger, StopDespues(1))
+    botmain.trading_loop(db, engine, logger, StopDespues(1))
+    assert not engine.close_all.called
+    assert not db.clear_force_close.called
+    botmain.trading_loop(db, engine, logger, StopDespues(1))
+    assert engine.close_all.call_count == 1
+    assert db.clear_force_close.call_count == 1
+
+
+def test_mt5_caido_reporta_mt5_down_y_no_toca_posiciones(monkeypatch):
+    _entorno(monkeypatch)
+    _watch(monkeypatch, "RECONNECTING")
+    db, engine = _doble_db({}), _doble_engine()
+    botmain.trading_loop(db, engine, MagicMock(), StopDespues(2))
+    db.report.assert_called_with("MT5_DOWN")
+    assert not db.upsert_positions.called
+    assert not db.report_state.called
+
+
+def test_tickets_conocidos_sobreviven_a_la_caida(monkeypatch):
+    _entorno(monkeypatch)
+    estados = iter(["OK", "RECONNECTING", "OK"])
+    actual = {}
+
+    class W:
+        def __init__(self, *a, **k):
+            pass
+
+        def check(self):
+            actual["e"] = next(estados)
+            return actual["e"]
+
+    monkeypatch.setattr(botmain, "Mt5Watch", W)
+    db, engine = _doble_db({}), _doble_engine()
+    # Con MT5 caido positions() devuelve [] (como el Broker real).
+    engine.b.positions.side_effect = lambda: (
+        [SimpleNamespace(ticket=7)] if actual["e"] == "OK" else [])
+    monkeypatch.setattr(botmain, "_open_position_row", lambda p: {"ticket": p.ticket})
+    cerradas = []
+    monkeypatch.setattr(botmain, "_closed_position_row",
+                        lambda b, t: cerradas.append(t) or {"ticket": t})
+    botmain.trading_loop(db, engine, MagicMock(), StopDespues(3))
+    assert cerradas == []
+
+
+def test_motivo_salida_distingue_give_up():
+    try:
+        raise SystemExit(3)
+    except SystemExit:
+        assert "MT5" in botmain._motivo_salida()
+    assert "manual" in botmain._motivo_salida()

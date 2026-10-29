@@ -126,3 +126,16 @@ def test_fallo_suelto_se_recupera_sin_reconectar():
     assert w.check() == "OK"
     assert mt5.init_calls == []
     assert not logger.write.called
+
+
+def test_on_reconnect_se_llama_al_reconectar():
+    llamadas = []
+    mt5, reloj, logger = FakeMt5(), Reloj(), MagicMock()
+    w = Mt5Watch({}, logger, clock=reloj, mt5_module=mt5,
+                 on_reconnect=lambda: llamadas.append(1))
+    mt5.vivo = False
+    for _ in range(3):
+        w.check()
+    assert llamadas == [1]
+    assert w.check() == "OK"
+    assert llamadas == [1]

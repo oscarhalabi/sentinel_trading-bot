@@ -56,7 +56,7 @@ def run_lite(engine_cls=None):
     except KeyboardInterrupt:
         pass
     finally:
-        logger.write("SYSTEM", "Detencion manual solicitada.")
+        logger.write("SYSTEM", botmain._motivo_salida())
         botmain.shutdown(db, getattr(engine, 'localdb', None))
         print("Bot detenido.")
 

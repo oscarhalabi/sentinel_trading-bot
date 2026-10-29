@@ -3,7 +3,7 @@
 Si el terminal muere (p. ej. un reinicio general lo mata) el proceso Python
 sigue vivo pero todas las llamadas a MT5 fallan. Este vigilante lo detecta
 (una vez por heartbeat), intenta reconectar con espera creciente y, si pasan
-demasiados minutos, se rinde para que el bucle salga y el vigilante de
+demasiados minutos (aprox.: se evalua en cada latido), se rinde para que el bucle salga y el vigilante de
 procesos relance el motor.
 """
 import time
@@ -11,7 +11,7 @@ import time
 
 class Mt5Watch:
     def __init__(self, init_kwargs, logger, *, fail_threshold=3, giveup_s=300.0,
-                 backoff_s=(5, 15, 30, 60), clock=time.monotonic, mt5_module=None):
+                 backoff_s=(5, 15, 30, 60), clock=time.monotonic, mt5_module=None, on_reconnect=None):
         if mt5_module is None:
             import MetaTrader5 as mt5_module
         self._mt5 = mt5_module
@@ -21,6 +21,7 @@ class Mt5Watch:
         self._giveup_s = giveup_s
         self._backoff = tuple(backoff_s)
         self._clock = clock
+        self._on_reconnect = on_reconnect  # se llama tras reconectar (p. ej. symbol_select)
         self._reset()
 
     def _reset(self):
@@ -88,6 +89,11 @@ class Mt5Watch:
         self._proximo_intento = ahora + espera
         self._log.write("SYSTEM", f"MT5 sin respuesta: reconectando (intento {self._intentos}).")
         if self._reconectar():
+            if self._on_reconnect is not None:
+                try:
+                    self._on_reconnect()
+                except Exception:  # noqa: BLE001
+                    pass
             self._log.write("SYSTEM", "MT5 reconectado.")
             self._reset()
             return "OK"

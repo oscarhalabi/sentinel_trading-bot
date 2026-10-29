@@ -55,7 +55,7 @@ modifica, así que el bot nuevo se defiende solo:
   para no entrar en un bucle si un motor se cae al arrancar). Además, el
   motor **reconecta MT5 por sí solo**: si el terminal deja de responder, tras 3 latidos
   fallidos intenta reconectar (esperas de 5, 15, 30 y 60 s) y mientras tanto no opera. Si en
-  5 minutos (`MT5_GIVEUP_S`) no lo logra, sale con código 3 y es el vigilante quien lo
+  unos 5 minutos (`MT5_GIVEUP_S`, aprox.: se evalúa en cada latido) no lo logra, sale con código 3 y es el vigilante quien lo
   vuelve a levantar.
 
 Consecuencia práctica: si un motor "desaparece" por unos minutos justo después de un alta en

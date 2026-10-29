@@ -158,7 +158,8 @@ user_id, bot_id, label, account_login, is_active, bot_status, last_heartbeat, cr
   - `false` = *close-only*: no abre nada nuevo, pero **sigue gestionando y
     cerrando** lo que ya tiene. No es una pausa dura
 - `bot_status` (TEXT) lo escribe **el bot**: `RUNNING` | `CLOSE_ONLY` | `FLAT` |
-  `STOPPED` | `ERROR`
+  `STOPPED` | `ERROR` | `MT5_DOWN` (el terminal MT5 no responde; el motor no opera y
+  reintenta reconectar, y si no lo logra sale solo). Es TEXT sin CHECK: no hace falta migración
 - `last_heartbeat` (TIMESTAMPTZ) lo escribe el bot cada 15 s. Si tiene más de
   ~60 s, el proceso está caído aunque `bot_status` diga `RUNNING`
 
