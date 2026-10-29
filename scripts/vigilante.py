@@ -7,15 +7,25 @@ este repo) y abre en una ventana nueva los que faltan.
 Solo mira procesos de este repo (scripts.procs.select_ours): nunca toca
 produccion. Pensado para la tarea programada SentinelN1Vigilante.
 
+Un motor parado a mano se relanza mientras su .env lo liste en BOTS. Para
+pararlo de forma permanente, quitalo de BOTS o apagalo desde el dashboard
+(is_active=false lo deja vivo en modo solo-cerrar).
+
+Limite anti-bucle: si un motor se ha relanzado 5 veces en 30 minutos (suele ser
+que se cae al arrancar), el vigilante deja de relanzarlo y lo registra como
+[ERROR] hasta que pase la ventana. El estado va en logs\vigilante_estado.json.
+
 Uso:  python -m scripts.vigilante [--dry-run] [--instances DIR]
 """
 
 import argparse
 import glob
+import json
 import os
 import re
 import subprocess
 import sys
+import time
 from datetime import datetime
 
 from motor.registry import load_registry, parse_bots, read_env_file
@@ -85,6 +95,31 @@ def missing(expected: set[tuple[str, str]], running: set[tuple[str, str]]) -> se
     return {(e, b) for e, b in expected if (_norm(e), b.lower()) not in vivos}
 
 
+MAX_REINTENTOS = 5
+VENTANA_S = 1800
+
+
+def should_relaunch(history: list[float], now: float, max_n: int = MAX_REINTENTOS,
+                    window_s: int = VENTANA_S) -> bool:
+    """False si ya hubo max_n relanzamientos o mas dentro de la ventana."""
+    return sum(1 for t in history if now - t < window_s) < max_n
+
+
+def _cargar_estado(path: str) -> dict[str, list[float]]:
+    try:
+        with open(path, encoding="utf-8") as f:
+            datos = json.load(f)
+        return {k: [float(t) for t in v] for k, v in datos.items()}
+    except (OSError, ValueError, TypeError, AttributeError):
+        return {}
+
+
+def _guardar_estado(path: str, estado: dict[str, list[float]]) -> None:
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(estado, f)
+
+
 def _lanzar(repo: str, env_path: str, bot: str) -> None:
     """Abre run_motor.ps1 en una ventana nueva (ruta absoluta, como start_all.ps1)."""
     runner = os.path.join(repo, "scripts", "run_motor.ps1")
@@ -112,15 +147,30 @@ def main(argv=None) -> int:
     if not faltan:
         _log(f"todo en orden: {len(esperadas)} motor(es) esperados, ninguno falta", log_path)
         return 0
+    estado_path = os.path.join(repo, "logs", "vigilante_estado.json")
+    ahora = time.time()
+    estado = _cargar_estado(estado_path)
+    # Se descartan las marcas fuera de la ventana.
+    estado = {k: [t for t in v if ahora - t < VENTANA_S] for k, v in estado.items()}
+    estado = {k: v for k, v in estado.items() if v}
     for env_path, bot in faltan:
+        clave = f"{_norm(env_path)}|{bot}"
+        historial = estado.get(clave, [])
+        if not should_relaunch(historial, ahora):
+            _log(f"[ERROR] {bot} ({os.path.basename(env_path)}) desactivado por "
+                 f"{len(historial)} reintentos en {VENTANA_S // 60} min; revisar log del motor", log_path)
+            continue
         if args.dry_run:
             _log(f"[dry-run] faltaria relanzar {bot} ({os.path.basename(env_path)})", log_path)
             continue
         _log(f"relanzando {bot} ({os.path.basename(env_path)})", log_path)
         try:
             _lanzar(repo, env_path, bot)
+            estado[clave] = historial + [ahora]
         except OSError as e:
             _log(f"[ERROR] no se pudo lanzar {bot}: {e}", log_path)
+    if not args.dry_run:
+        _guardar_estado(estado_path, estado)
     return 0
 
 

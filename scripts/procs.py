@@ -102,6 +102,7 @@ def list_processes() -> list[Proc]:
     salida = subprocess.run(
         ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
         capture_output=True, text=True, check=True,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
     ).stdout.strip()
     if not salida:
         return []
