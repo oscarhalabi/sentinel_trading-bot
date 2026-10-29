@@ -3,8 +3,8 @@
     Reinicio selectivo: tumba SOLO los procesos de este repo y relanza start_all.ps1.
 
 .DESCRIPTION
-    Lo dispara scripts/provision.py (via la tarea programada de reinicio) cuando
-    se provisiona una instancia nueva.
+    Se lanza a mano cuando hace falta reiniciar los motores del bot nuevo
+    (el vigilante relanza solo los caidos; esto reinicia todos).
 
     A diferencia del reinicio antiguo, NO mata "todo lo que parezca un bot":
     pregunta a "python -m scripts.procs list --json" (funcion select_ours) y mata

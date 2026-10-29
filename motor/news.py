@@ -1,10 +1,10 @@
 """NewsGuard: bloqueo duro por noticias de alto impacto (Fase 1).
 
 El paquete MetaTrader5 de Python NO expone el calendario economico (eso es
-API de MQL5), asi que el dato entra por archivo: un exportador MQL5
-(scripts/CalendarExporter.mq5) corre en el terminal y vuelca los eventos de
-las proximas horas a un JSON en la carpeta COMUN de MetaQuotes. Este modulo
-lo lee y responde una sola pregunta: ¿estamos dentro de la ventana de una
+API de MQL5), asi que el dato entra por archivo: un exportador en Python
+(scripts/news_exporter.py, que hoy corre en produccion) baja el calendario y
+vuelca los eventos de las proximas horas a un JSON en la carpeta COMUN de
+MetaQuotes. Este modulo lo lee y responde una sola pregunta: ¿estamos dentro de la ventana de una
 noticia roja relevante?
 
 Fase 1 = solo el bloqueo innegociable: eventos de importancia HIGH (rojas)

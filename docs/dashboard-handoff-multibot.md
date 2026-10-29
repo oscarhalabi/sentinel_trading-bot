@@ -1,3 +1,44 @@
+> **Actualizado en Fase 1 (2026-10-28).** Este documento empezó describiendo el paso de un bot
+> a dos (`m15` y `m5`, bot de producción exp-1). Al principio hay ahora una sección para los
+> **motores nuevos** (`n1`, `n2`...). Lo que sigue después de "INICIO DEL PROMPT" es el
+> contrato histórico de `m15`/`m5` y no cambia para los usuarios de producción.
+
+# Motores nuevos (`n1`, `n2`...) en la app web
+
+El bot nuevo (repo `sentinel_trading-bot`, paquete `motor/`) usa **las mismas tablas** de
+Supabase que el bot viejo, filtrando por `user_id` + `bot_id`. Un usuario puede tener varios
+motores sobre la misma cuenta MT5 (hoy `n1` y `n2`, ambos nulos: no abren operaciones).
+
+**Qué es igual que antes** (la app ya lo hace bien si filtra por `bot_id`):
+- `bot_instances`: una fila por usuario y motor, con su `is_active` (encendido/apagado,
+  close-only), `bot_status`, `last_heartbeat`. El toggle debe filtrar por `bot_id`.
+- `bot_state`: una fila por usuario y motor. `balance`, `equity`, `margin_*` y `floating_pnl`
+  son de la CUENTA (no se suman); `open_positions` es del motor (sí se suma).
+- `bot_positions` y `bot_logs`: con `bot_id`. `force_close` y `account_settings` (metas) igual.
+- `bot_candles`: las publica solo el primer motor de `BOTS=` de cada cuenta.
+
+**Qué es distinto:**
+1. **`bot_id`** nuevos: `n1`, `n2`... (nunca `m15`, `m5` ni `e2`). Los motores nuevos pueden
+   aumentar con el tiempo (scalping, intradía, uno por par...): la app no debe asumir una lista fija.
+2. **Etiquetas libres.** `bot_positions.op_type` y `bot_logs.log_type` ya no son una lista fija
+   (ENTRADA/PROTECCION/RECOVERY/RESCATE/GRINDER/HEALER/UNWIND/BUDGET...). Cada motor pone su
+   etiqueta (mayúsculas, hasta 20 caracteres). La app debe mostrar cualquier valor desconocido
+   con un estilo neutro. `ERROR`, `SYSTEM` y `SHADOW` siguen existiendo.
+3. **Configuración:** no usa `bot_config` (esa tabla es del bot viejo y no se toca). El motor
+   nuevo lee la tabla **`engine_config`** (`user_id`, `bot_id`, `params` JSON, `is_active`),
+   creada por `migrations/n1_001_engine_config.sql` (**pendiente de aplicar** hasta que Daniel la
+   revise). En Fase 1 basta con mostrar/editar el JSON `params` de forma simple.
+4. **Partes de la app fijas a `m15`/`m5`:** las métricas de cuenta prefieren la fila `m15` y
+   caen a `m5`; los conteos por motor y el signup (siembra `m15`+`m5`) también. Un usuario con
+   solo `n1` se ve vacío hasta que se cambie. Pedido: elegir la fila de métricas de cuenta
+   entre los motores que tenga el usuario (la más reciente), contar por motores existentes, y
+   no cambiar nada de lo que ven hoy los usuarios de producción.
+5. **Altas de usuarios del bot nuevo:** se hacen a mano (`python -m scripts.provision alta`),
+   no por `provision_requests` (el provisionador de producción tomaría la solicitud). El signup
+   por la app web para el bot nuevo queda para el día del reemplazo.
+
+---
+
 # Handoff al dashboard: de un bot a dos
 
 Prompt autocontenido para el agente que trabaja en el repo del dashboard web.

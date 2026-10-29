@@ -284,8 +284,8 @@ class Broker:
     def market_order(self, order_type, lots, comment, sl=0.0, tp=0.0, symbol=None):
         """Abre a mercado. `sl`/`tp` en PRECIO (0 = sin stop), como MQL5.
 
-        El Sentinel M15 abre siempre sin SL (su red es el Hedge Lock); el motor
-        M5 abre con SL por ATR desde el primer tick.
+        Si el motor no pasa `sl`, la orden sale sin stop; cada motor decide
+        si lo pone y a que precio.
         """
         symbol = symbol or self.symbol
         if self.shadow:
@@ -418,8 +418,8 @@ class Broker:
         """Todos los deals (IN + OUT/OUT_BY) de una posicion por su ticket.
 
         Permite reconstruir el cierre exacto (precio, hora, P&L total incl.
-        cierres parciales del Healer/Unwind) sin depender de una ventana de
-        tiempo. Ver bot/db.py::upsert_positions (bot_positions).
+        cierres parciales) sin depender de una ventana de
+        tiempo. Ver motor/db.py::upsert_positions (bot_positions).
         """
         deals = mt5.history_deals_get(position=ticket)
         return list(deals) if deals else []

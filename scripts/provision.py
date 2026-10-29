@@ -6,8 +6,9 @@ Da de alta UNA cuenta a mano desde la linea de comandos:
      (MT5_CLONES_DIR, por defecto C:\\MT5_instances_n1; modo portable).
   2. Siembra el perfil IPC y habilita Algo Trading en el clon.
   3. Escribe instances\\<user_id>.env (con la contrasena MT5; nunca se imprime).
-  4. Hace upsert en Supabase de bot_instances (is_active=false) y engine_config
-     (params={}) por cada motor, y crea account_settings solo si no existe.
+  4. En Supabase crea SOLO lo que falte (nunca pisa filas existentes):
+     bot_instances (is_active=false) y engine_config (params={}) por cada
+     motor, y account_settings.
 
 Este script NO lanza motores ni reinicia nada: las instancias nuevas las
 arranca el vigilante (scripts/vigilante.py). Tampoco toca la tarea programada
@@ -281,8 +282,8 @@ def alta(args, *, client=None, instances_dir=INSTANCES_DIR, clones_dir=None):
         print(f"  clon MT5 : {clone}")
         print(f"  .env     : {env_path}")
         print(f"  motores  : {', '.join(bots)}  magics: {magics}")
-        print(f"  Supabase : upsert bot_instances/engine_config x{len(bots)}, "
-              f"account_settings si falta (usuario {args.user_id})")
+        print(f"  Supabase : crea si falta bot_instances/engine_config x{len(bots)}, "
+              f"account_settings (usuario {args.user_id})")
         print(f"  cuenta   : login={args.login} server={args.server} password=******")
         return
 

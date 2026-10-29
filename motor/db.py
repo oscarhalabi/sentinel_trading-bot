@@ -4,7 +4,7 @@ El bot usa la service-role key (bypassa RLS) y filtra SIEMPRE por USER_ID.
 Multi-instancia: cada proceso lleva su USER_ID/SYMBOL en el entorno (.env).
 
 Multi-bot: un mismo usuario puede correr varios motores contra la MISMA cuenta
-(BOT_ID 'm15' = Sentinel, 'm5' = Grinder). Todas las consultas filtran ademas
+(BOT_ID 'n1', 'n2', ... segun motor/engines.json). Todas las consultas filtran ademas
 por BOT_ID para que los procesos no se pisen la config, el heartbeat ni el
 snapshot. Ver migrations/002_bot_id.sql.
 
@@ -165,7 +165,7 @@ class Database:
     def claim_profit_target(self):
         """Reclama el evento 'objetivo alcanzado' de forma atomica.
 
-        UPDATE ... WHERE target_reached_at IS NULL: solo un motor (m15 o m5)
+        UPDATE ... WHERE target_reached_at IS NULL: solo un motor
         gana la fila, asi el email sale UNA vez aunque ambos detecten el
         cruce en el mismo heartbeat. Devuelve True si este proceso gano.
         """
@@ -187,7 +187,7 @@ class Database:
         """Apaga TODAS las instancias del usuario (is_active=false = close-only).
 
         Se usa al alcanzar el objetivo de ganancia: el evento es de cuenta,
-        no de motor, asi que apaga m15 y m5 a la vez. Best-effort.
+        no de motor, asi que apaga todos los motores a la vez. Best-effort.
         """
         if self.client is None:
             return
@@ -257,7 +257,7 @@ class Database:
 
         (None, None, None) si no hay fila aun. Se lee una vez al arrancar para
         no resetear la base, re-contar flujos ni re-aplicar un reinicio de P&L
-        en cada restart del proceso (ver bot/main.py::setup,
+        en cada restart del proceso (ver motor/main.py::setup,
         _reconcile_capital_flows y _apply_baseline_reset).
         """
         if self.client is None:
@@ -320,7 +320,7 @@ class Database:
     # ==============================================================
     def get_open_tickets(self):
         """Tickets marcados status='OPEN' en bot_positions (para reconciliar
-        al arrancar, ver bot/main.py::setup). Set vacio ante fallo/sin datos.
+        al arrancar, ver motor/main.py::setup). Set vacio ante fallo/sin datos.
         """
         if self.client is None:
             return set()
@@ -358,7 +358,7 @@ class Database:
 
     # ==============================================================
     # Velas OHLC (bot_candles): datos de precio para la grafica del
-    # dashboard. Solo las publica el proceso m15 (ver bot/main.py).
+    # dashboard. Solo las publica un motor por cuenta (ver motor/main.py::_publish_candles).
     # ==============================================================
     def upsert_candles(self, rows):
         """Upsert de velas en bot_candles. Best-effort.

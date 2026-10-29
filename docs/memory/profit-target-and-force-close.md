@@ -5,6 +5,8 @@ metadata:
   type: project
 ---
 
+> Nota Fase 1 (2026-10-28): Escrita para el bot de producción (exp-1/e2). La mecánica (`account_settings`, claim atómico, `force_close`) se mantiene en `motor/`; los nombres de estrategia (`m15`, `m5`, `_close_all`) son del bot viejo.
+
 Feature de 2026-08-12 (migración `migrations/004_profit_target.sql`, pendiente de aplicar
 en Supabase): el usuario configura en el dashboard un **% de ganancia objetivo** y puede
 **forzar el cierre** de todas sus posiciones asumiendo el flotante.
@@ -52,7 +54,7 @@ en Supabase): el usuario configura en el dashboard un **% de ganancia objetivo**
   mostrar el flotante que asumiría; cada bot lo ve en su refresh de control (~3 s),
   llama `engine.close_all(reason)` (m15: wrapper de `_close_all`; m5: método nuevo) y
   consume el comando (`db.clear_force_close`: force_close=false + is_active=false).
-- **NO viola [[bot-design-constraints]]**: no es un emergency-stop automático por
+- **NO viola las reglas rígidas del bot viejo (ya descartadas)**: no es un emergency-stop automático por
   drawdown; siempre lo dispara el usuario a mano y la UI le muestra el flotante
   (positivo o negativo) que va a asumir antes de confirmar.
 
