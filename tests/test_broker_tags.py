@@ -48,3 +48,35 @@ def test_positions_multi_simbolo(monkeypatch):
     assert b.symbol == "XAUUSD"
     assert len(b.positions_all()) == 3
     assert sorted(p.symbol for p in b.positions()) == ["EURUSD", "XAUUSD"]
+
+
+def test_cierre_y_sl_usan_simbolo_de_la_posicion(monkeypatch):
+    enviados = []
+    monkeypatch.setattr(mt5, "order_send", lambda r: enviados.append(r))
+    ticks = {"XAUUSD": SimpleNamespace(bid=1.0, ask=1.1),
+             "EURUSD": SimpleNamespace(bid=2.0, ask=2.1)}
+    monkeypatch.setattr(mt5, "symbol_info_tick", lambda s: ticks.get(s))
+    b = Broker(_Logger(), symbols=("XAUUSD", "EURUSD"))
+    compra = SimpleNamespace(symbol="EURUSD", ticket=7, volume=0.1, tp=0.0,
+                             type=mt5.POSITION_TYPE_BUY)
+    venta = SimpleNamespace(symbol="EURUSD", ticket=8, volume=0.1, tp=0.0,
+                            type=mt5.POSITION_TYPE_SELL)
+    b.close_position(compra)
+    b.close_position(venta)
+    b.modify_sl(compra, 1.5)
+    assert [r["symbol"] for r in enviados] == ["EURUSD"] * 3
+    assert enviados[0]["price"] == 2.0   # cerrar BUY -> bid
+    assert enviados[1]["price"] == 2.1   # cerrar SELL -> ask
+
+
+def test_sin_tick_no_revienta(monkeypatch):
+    monkeypatch.setattr(mt5, "symbol_info_tick", lambda s: None)
+    monkeypatch.setattr(mt5, "order_send", lambda r: 1 / 0)
+    monkeypatch.setattr(Broker, "trade_allowed", lambda self: (True, None))
+    log = _Logger()
+    b = Broker(log)
+    pos = SimpleNamespace(symbol="XAUUSD", ticket=1, volume=0.1, tp=0.0,
+                          type=mt5.POSITION_TYPE_BUY)
+    assert b.close_position(pos) is None
+    assert b.market_order(mt5.ORDER_TYPE_BUY, 0.01, "X|y") is None
+    assert sum(1 for t, _ in log.lines if t == "ERROR") == 2

@@ -310,6 +310,10 @@ class Broker:
             return SimpleNamespace(retcode=mt5.TRADE_RETCODE_CLIENT_DISABLES_AT, order=0)
 
         tick = mt5.symbol_info_tick(symbol)
+        if tick is None:
+            self.logger.write("ERROR", f"Apertura {side} {symbol} cancelada: sin precio (tick) del simbolo.",
+                              0, lots, self.account_balance())
+            return None
         price = tick.ask if order_type == mt5.ORDER_TYPE_BUY else tick.bid
         request = {
             "action": mt5.TRADE_ACTION_DEAL,
@@ -335,10 +339,17 @@ class Broker:
             if position.type == mt5.POSITION_TYPE_BUY
             else mt5.ORDER_TYPE_BUY
         )
-        price = self.bid() if position.type == mt5.POSITION_TYPE_BUY else self.ask()
+        # Se usa el simbolo de la posicion (el bot puede operar varios).
+        tick = mt5.symbol_info_tick(position.symbol)
+        if tick is None:
+            self.logger.write("ERROR", f"Cierre ticket {position.ticket} cancelado: "
+                                       f"sin precio (tick) de {position.symbol}.",
+                              0, volume, self.account_balance())
+            return None
+        price = tick.bid if position.type == mt5.POSITION_TYPE_BUY else tick.ask
         request = {
             "action": mt5.TRADE_ACTION_DEAL,
-            "symbol": self.symbol,
+            "symbol": position.symbol,
             "volume": float(volume),
             "type": order_type,
             "position": position.ticket,
@@ -369,7 +380,7 @@ class Broker:
             return None
         request = {
             "action": mt5.TRADE_ACTION_SLTP,
-            "symbol": self.symbol,
+            "symbol": position.symbol,
             "position": position.ticket,
             "sl": float(sl),
             "tp": float(position.tp),
