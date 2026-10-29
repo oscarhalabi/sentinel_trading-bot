@@ -39,8 +39,8 @@ Guías: `docs/como-funciona.md` y `docs/convivencia-y-reemplazo.md`.
 - **Memoria y skills en el repo:** `docs/memory/` y `.claude/skills/` (4 skills iniciales).
 - **Limpieza de memoria:** se borraron las notas de estrategia vieja (Healer, Hedge, OP1-OP4, M5 v2,
   margen multi-bot, ideas y pendientes de exp-2, workflow de push directo). Siguen en el historial de git.
-- **Límite conocido:** el motor no reconecta MT5 por sí solo si pierde el terminal; lo cubre el vigilante
-  relanzando el proceso.
+- **Reconexión MT5:** `motor/mt5_watch.py` detecta que el terminal no responde (3 latidos), reconecta con
+  esperas crecientes y, a los 5 min (`MT5_GIVEUP_S`), el motor sale con código 3 para que el vigilante lo relance.
 
 ## Pendientes conocidos (para Oscar)
 

@@ -10,7 +10,7 @@ romperlos. Reglas:
 
 1. **Solo aditivo**: crear tablas/columnas/índices nuevos. Nunca borrar, renombrar ni cambiar
    el significado de algo existente. Nunca tocar `bot_config`.
-2. **Inspeccionar el esquema REAL** antes de escribir: producción ya aplicó migraciones 010-017
+2. **Inspeccionar el esquema REAL** (y solo con la aprobación de Daniel) antes de escribir: producción ya aplicó migraciones 010-017
    que no están en este repo. Correr (solo lectura, SQL editor de Supabase) las consultas de la
    sección "ANTES DE APLICAR" de `migrations/n1_001_engine_config.sql` (columnas existentes,
    `pg_constraint`, tipos de `bot_id`/`op_type`/`log_type`/`bots`, `pg_policies`). Si hay un

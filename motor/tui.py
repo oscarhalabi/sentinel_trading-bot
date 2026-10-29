@@ -10,7 +10,7 @@ Uso:    python -m motor.run --mode tui
 Teclas: [p] params   [Up/Dn, PgUp/PgDn] desplazar log   [Fin] log al vivo   [q] salir
 
 El motor de trading corre en un HILO aparte (motor.main.trading_loop). La UI
-solo LEE engine.hud / engine.df_m15 / engine.cfg (snapshots publicados por el
+solo LEE engine.hud / engine.df / engine.cfg (snapshots publicados por el
 motor). Ninguna llamada a MetaTrader5 ocurre en el hilo de la UI.
 """
 
@@ -42,10 +42,8 @@ from .logger import Logger
 
 LOG_COLORS = {
     "SYSTEM": "cyan", "ERROR": "bold red", "EXITO": "bold green",
-    "OPERACION": "green", "HEALER": "magenta", "UNWIND": "yellow",
-    "GRINDER": "blue", "SHADOW": "dim", "PROTECCION": "yellow",
-    "ENTRADA": "bold green", "RECOVERY": "green", "RESCATE": "bold yellow",
-    "CIERRE": "green", "VCB": "bold red", "BUDGET": "bold magenta",
+    "OPERACION": "green", "SHADOW": "dim", "PROTECCION": "yellow",
+    "ENTRADA": "bold green", "CIERRE": "green",
 }
 
 PARAM_SKIP = {"id", "user_id", "bot_id", "updated_at"}
@@ -250,13 +248,9 @@ def build_layout(layout, engine, log_buf, show_params, size, log_scroll=0):
         Layout(name="log", ratio=28),
     )
 
-    # El Sentinel publica df_m15; el motor M5 publica df_m5. Se grafica el
-    # timeframe operativo de cada uno.
-    df = getattr(engine, "df_m15", None)
-    tf_label = "M15"
-    if df is None:
-        df = getattr(engine, "df_m5", None)
-        tf_label = "M5"
+    # El motor publica en `engine.df` (velas, opcional) el timeframe que opera.
+    df = getattr(engine, "df", None)
+    tf_label = getattr(engine, "df_label", "")
     symbol = config.SYMBOL
     if show_params:
         layout["top"].split_row(Layout(name="chart", ratio=62), Layout(name="params", ratio=38))
@@ -297,9 +291,18 @@ def run_tui(engine_cls=None):
         return
 
     stop_event = threading.Event()
-    worker = threading.Thread(
-        target=botmain.trading_loop, args=(db, engine, logger, stop_event), daemon=True
-    )
+    salida = {"codigo": None}
+
+    def _correr_bucle():
+        # Un SystemExit dentro de un hilo muere en silencio: lo guardamos, paramos
+        # la UI y lo re-lanzamos desde el hilo principal tras cerrar todo.
+        try:
+            botmain.trading_loop(db, engine, logger, stop_event)
+        except SystemExit as e:
+            salida["codigo"] = e.code
+            stop_event.set()
+
+    worker = threading.Thread(target=_correr_bucle, daemon=True)
     worker.start()
 
     show_params = False
@@ -359,6 +362,8 @@ def run_tui(engine_cls=None):
         worker.join(timeout=2)
         botmain.shutdown(db, getattr(engine, 'localdb', None))
         console.print("Bot detenido.")
+    if salida["codigo"] is not None:
+        raise SystemExit(salida["codigo"])
 
 
 if __name__ == "__main__":

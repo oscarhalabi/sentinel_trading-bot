@@ -52,9 +52,11 @@ modifica, así que el bot nuevo se defiende solo:
   producción (`bot.main|tui|lite`, `run_instance.ps1`) no mate los procesos Python.
 - Los terminales sí mueren. El **vigilante** (`SentinelN1Vigilante`, cada 3 minutos) detecta
   los motores que faltan y los relanza (con tope de 5 relanzamientos en 30 minutos por motor,
-  para no entrar en un bucle si un motor se cae al arrancar). Ojo: el motor todavía **no**
-  reconecta MT5 por sí solo si pierde el terminal; si el proceso muere, es el vigilante quien
-  lo vuelve a levantar (la reconexión propia queda pendiente, ver las decisiones en memoria).
+  para no entrar en un bucle si un motor se cae al arrancar). Además, el
+  motor **reconecta MT5 por sí solo**: si el terminal deja de responder, tras 3 latidos
+  fallidos intenta reconectar (esperas de 5, 15, 30 y 60 s) y mientras tanto no opera. Si en
+  5 minutos (`MT5_GIVEUP_S`) no lo logra, sale con código 3 y es el vigilante quien lo
+  vuelve a levantar.
 
 Consecuencia práctica: si un motor "desaparece" por unos minutos justo después de un alta en
 producción, es normal. Si pasa seguido, avisar a Daniel.
@@ -97,7 +99,8 @@ después del PR al repo original (sección 8). Cuenta por cuenta, nunca todas a 
    queda en close-only) y esperar a que cierre todo. Si hace falta, cierre forzado desde la app.
 3. Parar el motor viejo de esa cuenta (cuando ya no hay posiciones).
 4. En el `.env` de la instancia, cambiar `BOTS=e2` por `BOTS=n1` (el motor nuevo que corresponda)
-   y añadir su magic (`MAGIC_N1=...`).
+   y añadir su magic (`MAGIC_N1=...`). Ese cambio solo aplica después del PR al repo original:
+   los `.env` de producción viven fuera de este repo y nunca se editan desde aquí.
 5. Comprobar que existan las filas del motor nuevo para ese usuario en Supabase
    (`bot_instances` y `engine_config` con `bot_id='n1'`). Pueden crearse con `provision alta`
    o a mano.

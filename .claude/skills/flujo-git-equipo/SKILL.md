@@ -53,4 +53,4 @@ de Vercel antes de mergear. Nunca push directo a su `main`.
 
 ## Hacia el repo original
 Lo bueno se manda más adelante como PR a `lozadaitm/sentinel_trading-bot`
-(ver `docs/convivencia-y-reemplazo.md`, sección "Qué unificar en ese PR").
+(ver `docs/convivencia-y-reemplazo.md`, sección "Qué unificar en el PR al repo original").

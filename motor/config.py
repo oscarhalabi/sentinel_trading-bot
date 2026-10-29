@@ -166,6 +166,12 @@ CONTROL_REFRESH = 3
 # Cada cuantos segundos escribir heartbeat + bot_status en bot_instances.
 HEARTBEAT_INTERVAL = 15
 
+# Reconexion a MT5: tras este numero de heartbeats seguidos sin respuesta del
+# terminal se intenta reconectar; pasados MT5_GIVEUP_S segundos sin lograrlo el
+# motor sale (codigo 3) para que el vigilante de procesos lo relance.
+MT5_FAIL_THRESHOLD = 3
+MT5_GIVEUP_S = float(os.environ.get("MT5_GIVEUP_S", "300"))
+
 # Modo sombra: si True, on_tick loguea decisiones pero NO envia ordenes.
 # Se activa por entorno/.env (SHADOW_MODE=true), por instancia.
 SHADOW_MODE = os.environ.get("SHADOW_MODE", "").lower() in ("1", "true", "yes")

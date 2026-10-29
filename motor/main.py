@@ -24,6 +24,7 @@ from .broker import Broker
 from .db import Database
 from .localdb import LocalDB
 from .logger import Logger
+from .mt5_watch import Mt5Watch
 
 
 def disable_quickedit():
@@ -368,6 +369,9 @@ def trading_loop(db, engine, logger, stop_event=None):
     last_report = 0.0
     cfg = {}
     known_open_tickets = set()  # ultimo set de tickets OPEN reportado a bot_positions
+    watch = Mt5Watch(config.mt5_init_kwargs(), logger,
+                     fail_threshold=config.MT5_FAIL_THRESHOLD, giveup_s=config.MT5_GIVEUP_S)
+    mt5_estado = "OK"  # ultimo veredicto del vigilante (se actualiza en cada heartbeat)
 
     def running():
         return stop_event is None or not stop_event.is_set()
@@ -405,9 +409,20 @@ def trading_loop(db, engine, logger, stop_event=None):
                     engine.is_active = False
                     engine.close_only = True
 
+            # Vigilante de MT5: una vez por heartbeat, ANTES de operar.
+            if now - last_report >= config.HEARTBEAT_INTERVAL:
+                mt5_estado = watch.check()
+                if mt5_estado == "GIVE_UP":
+                    # SystemExit no lo atrapa el `except Exception` de abajo; los
+                    # llamadores (run/lite/tui) cierran en su `finally`.
+                    logger.write("ERROR", "MT5 no volvio: salgo con codigo 3 para que el "
+                                          "vigilante relance el motor.")
+                    raise SystemExit(3)
+
             # Sin config no hay nada que gestionar, pero el heartbeat y el
             # reporte siguen: la instancia debe verse viva en el dashboard.
-            if cfg:
+            # Con MT5 caido o reconectando tampoco se opera (el heartbeat sigue).
+            if cfg and mt5_estado == "OK":
                 engine.on_tick()
 
             # Heartbeat + estado observacional.

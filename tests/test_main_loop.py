@@ -27,6 +27,21 @@ def _entorno(monkeypatch, instancia=None):
     monkeypatch.setattr(botmain.time, "sleep", lambda s: None)
     monkeypatch.setattr(botmain.mt5, "account_info", lambda: None)
     monkeypatch.setattr(botmain, "_publish_candles", lambda db, n: None)
+    _watch(monkeypatch, "OK")
+
+
+def _watch(monkeypatch, *estados):
+    """Vigilante de MT5 falso: devuelve los estados dados (el ultimo se repite)."""
+    seq = list(estados)
+
+    class FakeWatch:
+        def __init__(self, *a, **k):
+            pass
+
+        def check(self):
+            return seq.pop(0) if len(seq) > 1 else seq[0]
+
+    monkeypatch.setattr(botmain, "Mt5Watch", FakeWatch)
 
 
 def _doble_db(cfg, instancias=None):
@@ -85,6 +100,24 @@ def test_force_close_consumido_solo_si_plano(monkeypatch):
     botmain.trading_loop(db, engine, MagicMock(), StopDespues(2))
     assert engine.close_all.call_count == 2
     assert db.clear_force_close.call_count == 1
+
+
+def test_loop_sale_con_give_up(monkeypatch):
+    _entorno(monkeypatch)
+    _watch(monkeypatch, "OK", "GIVE_UP")
+    db, engine = _doble_db({"params": {}}), _doble_engine()
+    with pytest.raises(SystemExit) as e:
+        botmain.trading_loop(db, engine, MagicMock(), StopDespues(10))
+    assert e.value.code == 3
+
+
+def test_loop_no_llama_on_tick_reconectando(monkeypatch):
+    _entorno(monkeypatch)
+    _watch(monkeypatch, "RECONNECTING")
+    db, engine = _doble_db({"params": {}}), _doble_engine()
+    botmain.trading_loop(db, engine, MagicMock(), StopDespues(3))
+    assert not engine.on_tick.called
+    assert db.report.called  # el heartbeat sigue saliendo
 
 
 def test_run_resuelve_motor(monkeypatch):
