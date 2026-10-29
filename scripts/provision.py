@@ -34,9 +34,11 @@ import argparse
 import datetime
 import hashlib
 import os
+import re
 import shutil
 
-from motor.registry import load_registry, magic_for, parse_bots, validate_instance
+from motor.registry import (assert_usuario_propio, instance_env_files, load_registry, magic_for,
+                            parse_bots, validate_instance)
 from scripts.procs import CLONES_PRODUCCION, _es_o_contiene
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -108,9 +110,7 @@ def _find_supabase_creds():
         return url, key
     candidates = [os.path.join(ROOT, ".env")]
     if os.path.isdir(INSTANCES_DIR):
-        for name in sorted(os.listdir(INSTANCES_DIR)):
-            if name.endswith(".env") and not name.startswith(("example", "template", "_")):
-                candidates.append(os.path.join(INSTANCES_DIR, name))
+        candidates.extend(instance_env_files(INSTANCES_DIR))
     for path in candidates:
         vals = _read_env_file(path)
         if vals.get("SUPABASE_URL") and vals.get("SUPABASE_SERVICE_ROLE_KEY"):
@@ -240,6 +240,21 @@ def _clone_mt5(login, clones_dir):
     return exe
 
 
+def _assert_engine_config_existe(client):
+    """Aborta si falta la tabla engine_config (migracion n1_001 sin aplicar).
+
+    Se mira ANTES de escribir nada: si no, el alta quedaria a medias (el .env y
+    bot_instances escritos, engine_config no).
+    """
+    try:
+        client.table("engine_config").select("user_id").limit(0).execute()
+    except Exception as e:  # noqa: BLE001  (cualquier fallo aqui deja el alta sin empezar)
+        raise SystemExit(
+            "[ABORTADO] No se puede leer la tabla engine_config: aplica primero "
+            f"migrations/n1_001 (con aprobacion de Daniel). Detalle: {e}"
+        ) from e
+
+
 def _upsert_supabase(client, user_id, bots, login, label):
     """Crea las filas del usuario SOLO si faltan: repetir el alta nunca pisa nada
     (ni is_active/label de una instancia ya encendida, ni params ya ajustados)."""
@@ -267,7 +282,7 @@ def alta(args, *, client=None, instances_dir=INSTANCES_DIR, clones_dir=None):
         raise SystemExit(
             f"[ABORTADO] MT5_CLONES_DIR '{clones_dir}' coincide con la carpeta de "
             f"produccion {CLONES_PRODUCCION}, la contiene o esta dentro de ella.")
-    if not str(args.login).isdigit():
+    if not re.fullmatch(r"[0-9]+", str(args.login)):
         raise SystemExit(f"[ABORTADO] --login debe ser numerico (recibido: {args.login!r}).")
     registro = load_registry()
     bots = parse_bots(args.bots)
@@ -294,6 +309,11 @@ def alta(args, *, client=None, instances_dir=INSTANCES_DIR, clones_dir=None):
                              "(entorno, .env raiz o algun instances/*.env).")
         from supabase import create_client  # import tardio: mismo venv que el bot
         client = create_client(url, key)
+
+    # Antes de clonar o escribir nada: el usuario no puede ser de produccion y la
+    # tabla engine_config tiene que existir.
+    assert_usuario_propio(client, args.user_id, registro)
+    _assert_engine_config_existe(client)
 
     mt5_path = _clone_mt5(args.login, clones_dir)
     contenido = render_env({

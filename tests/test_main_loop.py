@@ -280,3 +280,39 @@ def test_positions_all_none_es_error_y_vacio_es_plano(monkeypatch):
         b.positions_all()
     monkeypatch.setattr(brk.mt5, "positions_get", lambda symbol=None: ())
     assert b.positions_all() == []
+
+
+def _setup_hasta_db(monkeypatch, filas):
+    """setup() con MT5 falso y una DB cuyo bot_instances devuelve 'filas'."""
+    monkeypatch.setattr(config, "BOT_ID", "n1")
+    monkeypatch.setattr(config, "validate_identity", lambda: [])
+    monkeypatch.setattr(botmain.mt5, "initialize", lambda **k: True)
+    monkeypatch.setattr(botmain.mt5, "symbol_select", lambda s, v: True)
+    monkeypatch.setattr(botmain.mt5, "shutdown", lambda: None)
+    db = MagicMock()
+    db.client.table.return_value.select.return_value.eq.return_value.execute.return_value = (
+        SimpleNamespace(data=filas))
+    monkeypatch.setattr(botmain, "Database", lambda: db)
+    return db
+
+
+def test_setup_aborta_con_usuario_de_produccion(monkeypatch):
+    db = _setup_hasta_db(monkeypatch, [{"bot_id": "m5"}])
+    logger = MagicMock()
+    with pytest.raises(SystemExit) as e:
+        botmain.setup(logger=logger, engine_cls=NullEngine)
+    assert "produccion" in str(e.value)
+    db.connect.assert_called_once()
+    db.client.table.assert_called_with("bot_instances")
+    db.close.assert_called_once()
+    assert not logger.add_sink.called  # no llego a arrancar nada mas
+
+
+def test_setup_sigue_con_usuario_propio(monkeypatch):
+    db = _setup_hasta_db(monkeypatch, [{"bot_id": "n1"}])
+    logger = MagicMock()
+    # Se corta justo despues del guard: basta con ver que pasa de ahi.
+    logger.add_sink.side_effect = RuntimeError("paso el guard")
+    with pytest.raises(RuntimeError, match="paso el guard"):
+        botmain.setup(logger=logger, engine_cls=NullEngine)
+    assert not db.close.called

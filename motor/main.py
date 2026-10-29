@@ -71,7 +71,8 @@ def setup(logger=None, engine_cls=None):
     # Antes de tocar MT5 o la DB: si BOT_ID y MAGIC_NUMBER no se corresponden,
     # los dos motores se verian las posiciones mutuamente. Aborta el arranque.
     identity_warnings = config.validate_identity()
-    spec = registry.load_registry()[config.BOT_ID]
+    reg = registry.load_registry()
+    spec = reg[config.BOT_ID]
     symbols = registry.symbols_for(spec, config.SYMBOL)
 
     if not mt5.initialize(**config.mt5_init_kwargs()):
@@ -83,6 +84,13 @@ def setup(logger=None, engine_cls=None):
 
     db = Database()
     db.connect()  # conecta a Supabase + arranca el flusher de logs
+    # Un usuario con instancias de produccion (m15/m5/e2) no es nuestro: no arrancar.
+    try:
+        registry.assert_usuario_propio(db.client, config.USER_ID, reg)
+    except SystemExit:
+        db.close()
+        mt5.shutdown()
+        raise
 
     if logger is None:
         logger = Logger(enable_file=True, file_name=_log_file_name(), symbol=config.SYMBOL)

@@ -62,3 +62,78 @@ def test_load_engine_class():
     spec = registry.EngineSpec("x", "collections:OrderedDict", "MAGIC_X", 1, None, "")
     from collections import OrderedDict
     assert registry.load_engine_class(spec) is OrderedDict
+
+
+# --- magics de produccion por defecto ---
+
+def test_magic_de_produccion_por_defecto_aborta_sin_env(reg):
+    # Aunque el .env no traiga MAGIC_M15/M5/E2, sus valores de produccion valen.
+    for magic in ("100100", "100200", "100300"):
+        with pytest.raises(SystemExit):
+            registry.validate_instance(reg, ["n1"], {"MAGIC_N1": magic})
+
+
+def test_magic_de_produccion_movido_libera_el_por_defecto(reg):
+    # Si produccion usa otro magic para m15, el 100100 ya no choca... pero el nuevo si.
+    registry.validate_instance(reg, ["n1"], {"MAGIC_N1": "100100", "MAGIC_M15": "111"})
+    with pytest.raises(SystemExit):
+        registry.validate_instance(reg, ["n1"], {"MAGIC_N1": "111", "MAGIC_M15": "111"})
+
+
+# --- usuario de produccion ---
+
+class _Filas:
+    def __init__(self, filas):
+        self.filas = filas
+        self.filtros = {}
+        self.tabla = None
+
+    def table(self, nombre):
+        self.tabla = nombre
+        return self
+
+    def select(self, *_a, **_k):
+        return self
+
+    def eq(self, col, val):
+        self.filtros[col] = val
+        return self
+
+    def execute(self):
+        class R:
+            pass
+        r = R()
+        r.data = [f for f in self.filas if f.get("user_id") == self.filtros.get("user_id")]
+        return r
+
+
+def test_usuario_de_produccion_aborta(reg):
+    cli = _Filas([{"user_id": "u", "bot_id": "m15"}, {"user_id": "u", "bot_id": "n1"}])
+    with pytest.raises(SystemExit) as e:
+        registry.assert_usuario_propio(cli, "u", reg)
+    assert "produccion" in str(e.value) and "m15" in str(e.value)
+    assert cli.tabla == "bot_instances" and cli.filtros == {"user_id": "u"}
+
+
+def test_usuario_propio_o_nuevo_no_aborta(reg):
+    registry.assert_usuario_propio(_Filas([]), "u", reg)
+    registry.assert_usuario_propio(_Filas([{"user_id": "u", "bot_id": "n1"},
+                                           {"user_id": "otro", "bot_id": "e2"}]), "u", reg)
+
+
+# --- que .env son instancias ---
+
+def test_instance_env_files_salta_plantillas(tmp_path):
+    for nombre in ("a.env", "B.env", "example.env", "Example-m5.env", "template_x.env",
+                   "_borrador.env", "a.env.new", "notas.txt"):
+        (tmp_path / nombre).write_text("BOTS=n1\n", encoding="utf-8")
+    nombres = [p.rsplit("\\", 1)[-1].rsplit("/", 1)[-1]
+               for p in registry.instance_env_files(str(tmp_path))]
+    assert nombres == ["a.env", "B.env"]
+
+
+def test_registry_cli_list(tmp_path, capsys):
+    (tmp_path / "a.env").write_text("BOTS=n1\n", encoding="utf-8")
+    (tmp_path / "example.env").write_text("BOTS=n1\n", encoding="utf-8")
+    assert registry.main(["list", str(tmp_path)]) == 0
+    assert capsys.readouterr().out.strip().splitlines() == [str(tmp_path / "a.env")]

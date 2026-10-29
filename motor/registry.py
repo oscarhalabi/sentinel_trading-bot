@@ -4,6 +4,7 @@ Los motores se declaran en engines.json (junto a este archivo, no depende del
 directorio desde donde se lance el bot). Aqui se cargan y se validan.
 """
 
+import glob
 import importlib
 import json
 import os
@@ -12,8 +13,14 @@ from typing import Mapping
 
 DEFAULT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "engines.json")
 
-# Magics de los bots de produccion: ningun motor nuevo puede usarlos.
-PRODUCTION_MAGIC_ENVS = ("MAGIC_M15", "MAGIC_M5", "MAGIC_E2")
+# Magics de los bots de produccion: ningun motor nuevo puede usarlos. Si el .env
+# no los trae, valen los mismos por defecto que usa produccion (bot/config.py).
+PRODUCTION_MAGIC_DEFAULTS = {"MAGIC_M15": 100100, "MAGIC_M5": 100200, "MAGIC_E2": 100300}
+PRODUCTION_MAGIC_ENVS = tuple(PRODUCTION_MAGIC_DEFAULTS)
+
+# Archivos de instances\ que NO son instancias (plantillas y borradores).
+# Regla unica: la usan el vigilante, start_all.ps1 (via "list") y el provisionador.
+PREFIJOS_NO_INSTANCIA = ("example", "template", "_")
 
 
 @dataclass(frozen=True)
@@ -76,13 +83,42 @@ def validate_instance(registry: dict[str, EngineSpec], bots: list[str],
                 f"[ABORTADO] Los bots {magics[m]} y {b} comparten el magic {m}."
             )
         magics[m] = b
-    for name in PRODUCTION_MAGIC_ENVS:
-        value = env.get(name)
-        if value and int(value) in magics:
+    for name, defecto in PRODUCTION_MAGIC_DEFAULTS.items():
+        value = int(env.get(name) or defecto)
+        if value in magics:
             raise SystemExit(
-                f"[ABORTADO] El magic {value} del bot {magics[int(value)]} "
+                f"[ABORTADO] El magic {value} del bot {magics[value]} "
                 f"choca con {name} de produccion."
             )
+
+
+def assert_usuario_propio(client, user_id: str, registry: dict[str, EngineSpec]) -> None:
+    """Aborta si el usuario ya tiene instancias de motores que no son de este bot.
+
+    Un usuario con filas bot_instances de m15/m5/e2 (o cualquier bot_id fuera de
+    engines.json) es de produccion: el bot nuevo no debe operar ni dar de alta
+    sobre el.
+    """
+    filas = (client.table("bot_instances").select("bot_id")
+             .eq("user_id", user_id).execute().data) or []
+    ajenos = sorted({str(f.get("bot_id")) for f in filas if f.get("bot_id") not in registry})
+    if ajenos:
+        raise SystemExit(
+            f"[ABORTADO] Este usuario pertenece a produccion (motores: {', '.join(ajenos)}); "
+            f"usa un usuario nuevo."
+        )
+
+
+def es_env_de_instancia(nombre: str) -> bool:
+    """True si el archivo es el .env de una instancia (no plantilla ni borrador)."""
+    n = os.path.basename(nombre).lower()
+    return n.endswith(".env") and not n.startswith(PREFIJOS_NO_INSTANCIA)
+
+
+def instance_env_files(instances_dir: str) -> list[str]:
+    """Rutas de los .env de instancia de la carpeta, en orden alfabetico."""
+    rutas = glob.glob(os.path.join(instances_dir, "*.env"))
+    return sorted((r for r in rutas if es_env_de_instancia(r)), key=lambda r: r.lower())
 
 
 def symbols_for(spec: EngineSpec, default_symbol: str) -> tuple[str, ...]:
@@ -114,12 +150,18 @@ def main(argv: list[str] | None = None) -> int:
 
     magic <bot_id>    imprime el magic del motor (lee os.environ).
     check <envfile>   valida BOTS y los magics del .env (sale con error si algo no cuadra).
+    list <carpeta>    imprime los .env de instancia de la carpeta (uno por linea).
     """
     import sys
     args = list(sys.argv[1:] if argv is None else argv)
-    if len(args) != 2 or args[0] not in ("magic", "check"):
-        raise SystemExit("Uso: python -m motor.registry magic <bot_id> | check <envfile>")
+    if len(args) != 2 or args[0] not in ("magic", "check", "list"):
+        raise SystemExit("Uso: python -m motor.registry magic <bot_id> | check <envfile> "
+                         "| list <carpeta>")
     cmd, valor = args
+    if cmd == "list":
+        for ruta in instance_env_files(valor):
+            print(ruta)
+        return 0
     reg = load_registry()
     if cmd == "magic":
         bot_id = valor.strip().lower()

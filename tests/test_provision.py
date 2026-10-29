@@ -173,3 +173,58 @@ def test_alta_login_no_numerico_aborta_antes_de_nada(tmp_path):
                        clones_dir=str(tmp_path / "c"))
     assert cliente.calls == []
     assert not (tmp_path / "i").exists()
+
+
+def test_alta_login_no_ascii_aborta(tmp_path):
+    # '²'.isdigit() es True: el login debe ser solo 0-9.
+    cliente = FakeClient()
+    for malo in ("12²", "١٢"):
+        with pytest.raises(SystemExit):
+            provision.alta(_args(login=malo), client=cliente, instances_dir=str(tmp_path / "i"),
+                           clones_dir=str(tmp_path / "c"))
+    assert cliente.calls == []
+
+
+def _sin_clon(monkeypatch):
+    clonados = []
+    monkeypatch.setattr(provision, "_clone_mt5", lambda login, clones_dir: clonados.append(login) or "x")
+    monkeypatch.setattr(provision, "_find_supabase_creds", lambda: ("https://x", "KEY"))
+    return clonados
+
+
+def test_alta_usuario_de_produccion_aborta_antes_de_escribir(tmp_path, monkeypatch):
+    clonados = _sin_clon(monkeypatch)
+    uid = VALORES["user_id"]
+    cliente = FakeClient(existing={"bot_instances": [{"user_id": uid, "bot_id": "e2"}]})
+    with pytest.raises(SystemExit) as e:
+        provision.alta(_args(), client=cliente, instances_dir=str(tmp_path / "i"),
+                       clones_dir=str(tmp_path / "c"))
+    assert "produccion" in str(e.value)
+    assert cliente.calls == [] and clonados == []
+    assert not (tmp_path / "i").exists()
+
+
+class SinEngineConfig(FakeClient):
+    def table(self, name):
+        if name == "engine_config":
+            raise RuntimeError('relation "public.engine_config" does not exist')
+        return super().table(name)
+
+
+def test_alta_sin_tabla_engine_config_aborta_antes_de_escribir(tmp_path, monkeypatch):
+    clonados = _sin_clon(monkeypatch)
+    cliente = SinEngineConfig()
+    with pytest.raises(SystemExit) as e:
+        provision.alta(_args(), client=cliente, instances_dir=str(tmp_path / "i"),
+                       clones_dir=str(tmp_path / "c"))
+    assert "n1_001" in str(e.value)
+    assert cliente.calls == [] and clonados == []
+    assert not (tmp_path / "i").exists()
+
+
+def test_alta_dry_run_no_consulta_supabase(tmp_path):
+    class Explota:
+        def table(self, name):
+            raise AssertionError("dry-run no debe tocar Supabase")
+    provision.alta(_args(dry_run=True), client=Explota(), instances_dir=str(tmp_path / "i"),
+                   clones_dir=str(tmp_path / "c"))
