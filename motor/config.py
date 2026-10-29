@@ -52,11 +52,30 @@ BOT_ID = os.environ.get("BOT_ID", "m15")
 
 
 def validate_identity():
-    """Placeholder: aborta si falta USER_ID. Task 2 lo reescribe (BOT_ID/magic)."""
+    """Aborta si la identidad de la instancia no cuadra con el registro.
+
+    Comprueba que USER_ID no este vacio, que BOT_ID exista en engines.json y
+    que MAGIC_NUMBER sea el magic que el registro asigna a ese bot.
+    Devuelve una lista de avisos (vacia si todo esta bien).
+    """
+    from motor import registry
+
     if not USER_ID:
         raise SystemExit(
             "[ABORTADO] Falta USER_ID en el .env de la instancia. "
             "Es el id del usuario en Supabase (auth.users.id) y es obligatorio."
+        )
+    reg = registry.load_registry()
+    if BOT_ID not in reg:
+        raise SystemExit(
+            f"[ABORTADO] BOT_ID '{BOT_ID}' no esta en engines.json. "
+            f"Disponibles: {', '.join(sorted(reg))}."
+        )
+    esperado = registry.magic_for(reg[BOT_ID], os.environ)
+    if MAGIC_NUMBER != esperado:
+        raise SystemExit(
+            f"[ABORTADO] MAGIC_NUMBER={MAGIC_NUMBER} no coincide con el magic "
+            f"{esperado} que el registro asigna al bot '{BOT_ID}'."
         )
     return []
 
