@@ -94,3 +94,49 @@ def load_engine_class(spec: EngineSpec) -> type:
     """Resuelve 'modulo:Clase' con importlib (solo al usarla, no al importar)."""
     modulo, _, clase = spec.engine_class.partition(":")
     return getattr(importlib.import_module(modulo), clase)
+
+
+def read_env_file(path: str) -> dict[str, str]:
+    """Lee un .env (KEY=VALUE por linea) igual que lo hace run_motor.ps1."""
+    env: dict[str, str] = {}
+    with open(path, encoding="utf-8") as f:
+        for linea in f:
+            linea = linea.strip()
+            if not linea or linea.startswith("#") or "=" not in linea:
+                continue
+            clave, _, valor = linea.partition("=")
+            env[clave.strip()] = valor.strip().strip('"').strip("'")
+    return env
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Mini-CLI para los scripts .ps1.
+
+    magic <bot_id>    imprime el magic del motor (lee os.environ).
+    check <envfile>   valida BOTS y los magics del .env (sale con error si algo no cuadra).
+    """
+    import sys
+    args = list(sys.argv[1:] if argv is None else argv)
+    if len(args) != 2 or args[0] not in ("magic", "check"):
+        raise SystemExit("Uso: python -m motor.registry magic <bot_id> | check <envfile>")
+    cmd, valor = args
+    reg = load_registry()
+    if cmd == "magic":
+        bot_id = valor.strip().lower()
+        if bot_id not in reg:
+            raise SystemExit(
+                f"[ABORTADO] Bot desconocido: {bot_id}. Disponibles: {', '.join(sorted(reg))}."
+            )
+        print(magic_for(reg[bot_id], os.environ))
+        return 0
+    if not os.path.isfile(valor):
+        raise SystemExit(f"[ABORTADO] No existe el archivo de entorno: {valor}")
+    env = read_env_file(valor)
+    bots = parse_bots(env.get("BOTS"))
+    validate_instance(reg, bots, env)
+    print(f"[OK] {os.path.basename(valor)}: motores {', '.join(bots)}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
