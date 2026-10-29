@@ -4,8 +4,9 @@ Control por DB: la fila bot_config con status='ACTIVE' corre el motor;
 cualquier otro status pausa (espera). Sin news filter ni PAUSED_AI_OPUS
 (port puro MQL5).
 
-Uso (modo consola):  python -m bot.main
-Uso (modo TUI):      python -m bot.tui
+Uso (consola):  python -m motor.run --mode console
+Uso (TUI):      python -m motor.run --mode tui
+Uso (lite):     python -m motor.run --mode lite
 
 El cuerpo se parte en setup() / trading_loop() / shutdown() para que la TUI
 pueda reutilizar el mismo motor en un hilo aparte sin duplicar logica.
@@ -18,7 +19,7 @@ import time
 
 import MetaTrader5 as mt5
 
-from . import config, notify
+from . import config, notify, registry
 from .broker import Broker
 from .db import Database
 from .logger import Logger
@@ -51,17 +52,14 @@ def disable_quickedit():
 
 
 def _log_file_name():
-    """Nombre del CSV local. El M15 conserva el historico; los demas bots
-    escriben su propio archivo para no mezclar dos motores en un mismo log."""
-    if config.BOT_ID == "m15":
-        return "Gold_HyperGrinder_v20"
-    return f"Gold_{config.BOT_ID.upper()}"
+    """Nombre del CSV local: uno por bot, para no mezclar motores en un mismo log."""
+    return f"Motor_{config.BOT_ID.upper()}"
 
 
 def setup(logger=None, engine_cls=None):
     """Inicializa MT5, DB, broker y motor. Devuelve (db, broker, engine, logger).
 
-    `engine_cls` permite reusar todo el arranque con otro motor (M5Engine) sin
+    `engine_cls` permite reusar todo el arranque con otro motor sin
     duplicar la conexion, la DB ni el bucle. Es obligatorio.
     """
     if engine_cls is None:
@@ -70,12 +68,15 @@ def setup(logger=None, engine_cls=None):
     # Antes de tocar MT5 o la DB: si BOT_ID y MAGIC_NUMBER no se corresponden,
     # los dos motores se verian las posiciones mutuamente. Aborta el arranque.
     identity_warnings = config.validate_identity()
+    spec = registry.load_registry()[config.BOT_ID]
+    symbols = registry.symbols_for(spec, config.SYMBOL)
 
     if not mt5.initialize(**config.mt5_init_kwargs()):
         raise RuntimeError(f"No se pudo inicializar MetaTrader 5: {mt5.last_error()}")
 
-    if not mt5.symbol_select(config.SYMBOL, True):
-        print(f"[ALERTA] El simbolo {config.SYMBOL} no pudo ser seleccionado en el broker.")
+    for sym in symbols:
+        if not mt5.symbol_select(sym, True):
+            print(f"[ALERTA] El simbolo {sym} no pudo ser seleccionado en el broker.")
 
     db = Database()
     db.connect()  # conecta a Supabase + arranca el flusher de logs
@@ -87,6 +88,7 @@ def setup(logger=None, engine_cls=None):
 
     broker = Broker(logger, shadow=config.SHADOW_MODE)
     engine = engine_cls(broker, logger)
+    engine.symbols = symbols
     engine.init_history_cursor()
     engine.user_email = db.get_user_email()  # una vez al arrancar (para identificar la instancia)
 
@@ -111,7 +113,7 @@ def setup(logger=None, engine_cls=None):
             engine.last_flow_ticket = max(d.ticket for d in flows)
 
     # Backfill de velas para la grafica del dashboard + poda de retencion.
-    if config.BOT_ID == "m15":
+    if config.BOT_ID == config.CANDLES_PUBLISHER:
         _publish_candles(db, CANDLES_BACKFILL)
         db.prune_candles(days=CANDLES_KEEP_DAYS)
 
@@ -162,8 +164,8 @@ def _epoch_to_iso(epoch):
     return datetime.datetime.fromtimestamp(epoch, tz=datetime.timezone.utc).isoformat()
 
 
-# Velas para la grafica del dashboard (bot_candles). Solo las publica el
-# proceso m15: una unica fuente por cuenta (los dos motores ven el mismo feed).
+# Velas para la grafica del dashboard (bot_candles). Solo las publica el primer
+# motor de BOTS (config.CANDLES_PUBLISHER): una unica fuente por cuenta.
 CANDLES_BACKFILL = 400   # ~4 dias de M15 al arrancar
 CANDLES_KEEP_DAYS = 30   # retencion en la tabla
 CANDLES_HEARTBEAT = 2    # la vela en formacion + la previa, por heartbeat
@@ -188,8 +190,8 @@ def _candle_rows(rates):
 
 
 def _publish_candles(db, count):
-    """Upsert de las ultimas `count` velas M15. Best-effort, solo m15."""
-    if config.BOT_ID != "m15":
+    """Upsert de las ultimas `count` velas M15. Best-effort, solo el publicador."""
+    if config.BOT_ID != config.CANDLES_PUBLISHER:
         return
     try:
         rates = mt5.copy_rates_from_pos(config.SYMBOL, config.TIMEFRAME_CORE, 0, count)
@@ -396,12 +398,10 @@ def trading_loop(db, engine, logger, stop_event=None):
                     engine.is_active = False
                     engine.close_only = True
 
-            if not cfg:
-                # Sin config activa ni cache: nada que gestionar aun.
-                time.sleep(2)
-                continue
-
-            engine.on_tick()
+            # Sin config no hay nada que gestionar, pero el heartbeat y el
+            # reporte siguen: la instancia debe verse viva en el dashboard.
+            if cfg:
+                engine.on_tick()
 
             # Heartbeat + estado observacional.
             if now - last_report >= config.HEARTBEAT_INTERVAL:
@@ -500,6 +500,3 @@ def run(engine_cls=None):
         logger.write("SYSTEM", "Detencion manual solicitada.")
         shutdown(db)
 
-
-if __name__ == "__main__":
-    run()

@@ -1,6 +1,6 @@
 """Modo LITE: minimo consumo para VPS. Sin TUI, sin velas, sin log en consola.
 
-El motor de trading es EXACTAMENTE el mismo que en consola/TUI (bot.main.setup
+El motor de trading es EXACTAMENTE el mismo que en consola/TUI (motor.main.setup
 + trading_loop); lo unico que cambia es la presentacion: se imprime un banner
 "Operando en <usuario>" una sola vez y no se vuelve a tocar stdout. El log
 sigue completo en el CSV local y en Supabase (bot_logs), y el dashboard sigue
@@ -15,7 +15,7 @@ Que se ahorra respecto a la TUI:
 Los eventos ERROR si se imprimen (son raros y baratos): si una instancia se
 atasca, la ventana lo muestra sin tener que abrir el CSV.
 
-Uso:                 python -m bot.lite
+Uso:                 python -m motor.run --mode lite
 Uso (via launcher):  scripts\\run_instance.ps1 instances\\<usuario>.env -Lite
 """
 

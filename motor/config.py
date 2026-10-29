@@ -9,6 +9,8 @@ import os
 
 import MetaTrader5 as mt5
 
+from . import registry
+
 # Carga .env si existe (sin dependencia dura de python-dotenv).
 def _load_dotenv():
     path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
@@ -50,6 +52,12 @@ MAGIC_NUMBER = int(os.environ.get("MAGIC_NUMBER", "100100"))
 # ==================================================================
 BOT_ID = os.environ.get("BOT_ID", "m15")
 
+# Motor que publica las velas del dashboard: el primero de BOTS. Sin BOTS
+# (una instancia con un solo motor) es el propio BOT_ID.
+_bots_env = os.environ.get("BOTS", "")
+CANDLES_PUBLISHER = (registry.parse_bots(_bots_env)[0]
+                     if any(b.strip() for b in _bots_env.split(",")) else BOT_ID)
+
 
 def validate_identity():
     """Aborta si la identidad de la instancia no cuadra con el registro.
@@ -58,8 +66,6 @@ def validate_identity():
     que MAGIC_NUMBER sea el magic que el registro asigna a ese bot.
     Devuelve una lista de avisos (vacia si todo esta bien).
     """
-    from motor import registry
-
     if not USER_ID:
         raise SystemExit(
             "[ABORTADO] Falta USER_ID en el .env de la instancia. "
@@ -104,7 +110,7 @@ MT5_TIMEOUT_MS = int(os.environ.get("MT5_TIMEOUT_MS", "120000"))
 def mt5_init_kwargs():
     """Argumentos de mt5.initialize() para atacar el terminal de ESTA instancia.
 
-    UNICA fuente de verdad: la usan bot/main.py y los scripts de auditoria.
+    UNICA fuente de verdad: la usan motor/main.py y los scripts de auditoria.
     Olvidar `portable` en un clon portable lanza el terminal en modo normal
     (perfil nuevo en AppData + asistente de primera ejecucion => IPC timeout).
 
@@ -123,7 +129,7 @@ def mt5_init_kwargs():
     return kw
 
 # ==================================================================
-# RESEND (bot/notify.py) - notificaciones por correo al usuario.
+# RESEND (motor/notify.py) - notificaciones por correo al usuario.
 # Sin RESEND_API_KEY el modulo queda inerte (el evento igual queda en DB).
 # El from por defecto (onboarding@resend.dev) solo entrega al dueño de la
 # cuenta Resend; para usuarios reales, verificar dominio y setear RESEND_FROM.
@@ -134,9 +140,9 @@ RESEND_FROM = os.environ.get("RESEND_FROM", "Sentinel <onboarding@resend.dev>")
 DASHBOARD_URL = os.environ.get("DASHBOARD_URL", "https://sentinel-trading-webapp.vercel.app/")
 
 # ==================================================================
-# NEWSGUARD (bot/news.py)  - snapshot del calendario economico
-# Lo escribe scripts/CalendarExporter.mq5 en la carpeta COMUN de
-# MetaQuotes: una sola ruta que sirve a todas las instancias de esta PC.
+# NEWSGUARD (motor/news.py)  - snapshot del calendario economico
+# Lo escribe scripts/news_exporter.py (el de produccion) en la carpeta COMUN
+# de MetaQuotes: una sola ruta que sirve a todas las instancias de esta PC.
 # ==================================================================
 NEWS_CALENDAR_PATH = os.environ.get(
     "NEWS_CALENDAR_PATH",

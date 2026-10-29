@@ -6,10 +6,10 @@ Layout:
   - Abajo:   stream de log (capturado del Logger via sink), con scroll.
   - Tecla p: muestra/oculta el panel de PARAMETROS (bot_config) a la derecha.
 
-Uso:    python -m bot.tui
+Uso:    python -m motor.run --mode tui
 Teclas: [p] params   [Up/Dn, PgUp/PgDn] desplazar log   [Fin] log al vivo   [q] salir
 
-El motor de trading corre en un HILO aparte (bot.main.trading_loop). La UI
+El motor de trading corre en un HILO aparte (motor.main.trading_loop). La UI
 solo LEE engine.hud / engine.df_m15 / engine.cfg (snapshots publicados por el
 motor). Ninguna llamada a MetaTrader5 ocurre en el hilo de la UI.
 """
@@ -221,7 +221,8 @@ def render_params(cfg):
         return Panel(Text("Aun no se cargo bot_config...", style="dim"),
                      title="PARAMETROS", border_style="magenta")
 
-    items = [(k, cfg[k]) for k in sorted(cfg) if k not in PARAM_SKIP]
+    params = cfg.get("params", {}) or {}
+    items = [(k, params[k]) for k in sorted(params) if k not in PARAM_SKIP]
     mid = (len(items) + 1) // 2
 
     def mk(chunk):
@@ -233,7 +234,7 @@ def render_params(cfg):
         return t
 
     cols = Columns([mk(items[:mid]), mk(items[mid:])], expand=True)
-    return Panel(cols, title="PARAMETROS (bot_config)  —  (p) cerrar",
+    return Panel(cols, title="PARAMETROS (bot_config.params)  —  (p) cerrar",
                  border_style="magenta")
 
 
@@ -280,7 +281,7 @@ def build_layout(layout, engine, log_buf, show_params, size, log_scroll=0):
 # Main
 # ------------------------------------------------------------------
 def run_tui(engine_cls=None):
-    """UI en vivo. `engine_cls` permite abrirla sobre el motor M5 (ver bot.tui_m5)."""
+    """UI en vivo. `engine_cls` es el motor a abrir (lo resuelve motor.run)."""
     botmain.disable_quickedit()
     console = Console()
     log_buf = LogBuffer()
