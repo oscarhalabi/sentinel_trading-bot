@@ -11,12 +11,14 @@ class FakeTable:
     def __init__(self, client, name):
         self.client, self.name = client, name
         self._op = None
+        self._filtros = {}
 
     def select(self, *_a, **_k):
         self._op = ("select",)
         return self
 
-    def eq(self, *_a, **_k):
+    def eq(self, col, val):
+        self._filtros[col] = val
         return self
 
     def limit(self, *_a, **_k):
@@ -35,7 +37,8 @@ class FakeTable:
             data = []
         r = R()
         if self._op[0] == "select":
-            r.data = list(self.client.existing.get(self.name, []))
+            r.data = [f for f in self.client.existing.get(self.name, [])
+                      if all(f.get(c) == v for c, v in self._filtros.items())]
         else:
             self.client.calls.append((self.name,) + self._op)
         return r
@@ -68,13 +71,13 @@ def test_render_env_incluye_bots_y_magics():
     assert "MT5_PORTABLE=true" in txt
     assert "SYMBOL=XAUUSD+" in txt
     assert "MT5_PASSWORD=secreto" in txt
-    assert "MT5_CLONES_DIR=C:\MT5_instances_n1" in txt
+    assert "MT5_CLONES_DIR=" + r"C:\MT5_instances_n1" in txt
 
 
 def test_clone_dir_fuera_de_produccion():
     d = provision.clone_dir_for("123", r"C:\MT5_instances_n1")
-    assert d.lower().startswith("c:\mt5_instances_n1")
-    assert not d.lower().startswith("c:\mt5_instances\\")
+    assert d.lower().startswith(r"c:\mt5_instances_n1")
+    assert not d.lower().startswith("c:" + chr(92) + "mt5_instances" + chr(92))
 
 
 def _args(**kw):
@@ -122,11 +125,11 @@ def test_alta_real_upserts_y_env(tmp_path, monkeypatch, capsys):
     assert "MT5_PASSWORD=secreto" in env and "MAGIC_N2=300200" in env
     assert "secreto" not in capsys.readouterr().out
     tablas = [(c[0], c[1]) for c in cliente.calls]
-    assert tablas.count(("bot_instances", "upsert")) == 2
-    assert tablas.count(("engine_config", "upsert")) == 2
+    assert tablas.count(("bot_instances", "insert")) == 2
+    assert tablas.count(("engine_config", "insert")) == 2
     assert ("account_settings", "insert") in tablas
     bi = [c for c in cliente.calls if c[0] == "bot_instances"][0]
-    assert bi[2]["is_active"] is False and bi[3] == "user_id,bot_id"
+    assert bi[2]["is_active"] is False
     ec = [c for c in cliente.calls if c[0] == "engine_config"][0]
     assert ec[2]["params"] == {}
 
@@ -138,3 +141,35 @@ def test_alta_no_pisa_account_settings_existente(tmp_path, monkeypatch):
     provision.alta(_args(), client=cliente, instances_dir=str(tmp_path / "i"),
                    clones_dir=str(tmp_path / "c"))
     assert not [c for c in cliente.calls if c[0] == "account_settings"]
+
+
+def test_alta_repetida_no_pisa_filas_existentes(tmp_path, monkeypatch):
+    monkeypatch.setattr(provision, "_clone_mt5", lambda login, clones_dir: "x")
+    monkeypatch.setattr(provision, "_find_supabase_creds", lambda: ("https://x", "KEY"))
+    uid = VALORES["user_id"]
+    cliente = FakeClient(existing={
+        "bot_instances": [{"user_id": uid, "bot_id": "n1", "is_active": True, "label": "mia"}],
+        "engine_config": [{"user_id": uid, "bot_id": "n1", "params": {"x": 1}}],
+    })
+    provision.alta(_args(), client=cliente, instances_dir=str(tmp_path / "i"),
+                   clones_dir=str(tmp_path / "c"))
+    # n1 ya existia: no se toca. n2 no existia: se crea.
+    assert [c[2]["bot_id"] for c in cliente.calls if c[0] == "bot_instances"] == ["n2"]
+    assert [c[2]["bot_id"] for c in cliente.calls if c[0] == "engine_config"] == ["n2"]
+    assert not [c for c in cliente.calls if c[1] in ("upsert", "update")]
+
+
+def test_alta_rechaza_clones_dentro_de_produccion(tmp_path):
+    for malo in (r"C:\MT5_instances\x", r"c:\mt5_INSTANCES" + chr(92)):
+        with pytest.raises(SystemExit):
+            provision.alta(_args(), client=FakeClient(), instances_dir=str(tmp_path),
+                           clones_dir=malo)
+
+
+def test_alta_login_no_numerico_aborta_antes_de_nada(tmp_path):
+    cliente = FakeClient()
+    with pytest.raises(SystemExit):
+        provision.alta(_args(login="12a"), client=cliente, instances_dir=str(tmp_path / "i"),
+                       clones_dir=str(tmp_path / "c"))
+    assert cliente.calls == []
+    assert not (tmp_path / "i").exists()

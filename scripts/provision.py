@@ -216,6 +216,7 @@ def _seed_ipc_profile(clone_dir):
             print(f"    [AVISO] no se pudo sembrar {name}: {e}")
     print(f"    perfil IPC sembrado desde el base ({copied} entradas).")
 
+
 def _clone_mt5(login, clones_dir):
     """Copia la instalacion base a un clon propio del login. Idempotente."""
     clone_dir = clone_dir_for(login, clones_dir)
@@ -239,28 +240,34 @@ def _clone_mt5(login, clones_dir):
 
 
 def _upsert_supabase(client, user_id, bots, login, label):
-    """Crea las filas del usuario. Nunca pisa account_settings si ya existe."""
+    """Crea las filas del usuario SOLO si faltan: repetir el alta nunca pisa nada
+    (ni is_active/label de una instancia ya encendida, ni params ya ajustados)."""
+    def _crear_si_falta(tabla, filtros, fila):
+        q = client.table(tabla).select("user_id")
+        for col, val in filtros.items():
+            q = q.eq(col, val)
+        if not q.limit(1).execute().data:
+            client.table(tabla).insert(fila).execute()
+
     for bot_id in bots:
-        client.table("bot_instances").upsert(
-            {"user_id": user_id, "bot_id": bot_id, "is_active": False,
-             "label": label, "account_login": int(login)},
-            on_conflict="user_id,bot_id").execute()
-        client.table("engine_config").upsert(
-            {"user_id": user_id, "bot_id": bot_id, "params": {}},
-            on_conflict="user_id,bot_id").execute()
-    existe = (client.table("account_settings").select("user_id")
-              .eq("user_id", user_id).limit(1).execute().data)
-    if not existe:
-        client.table("account_settings").insert({"user_id": user_id}).execute()
+        clave = {"user_id": user_id, "bot_id": bot_id}
+        _crear_si_falta("bot_instances", clave,
+                        {**clave, "is_active": False, "label": label,
+                         "account_login": int(login)})
+        _crear_si_falta("engine_config", clave, {**clave, "params": {}})
+    _crear_si_falta("account_settings", {"user_id": user_id}, {"user_id": user_id})
 
 
 def alta(args, *, client=None, instances_dir=INSTANCES_DIR, clones_dir=None):
     """Da de alta una cuenta. Con args.dry_run solo muestra el plan (nada se escribe)."""
     clones_dir = clones_dir or MT5_CLONES_DIR
-    if _es_o_contiene(clones_dir, CLONES_PRODUCCION):
+    if (_es_o_contiene(clones_dir, CLONES_PRODUCCION)
+            or _es_o_contiene(CLONES_PRODUCCION, clones_dir)):
         raise SystemExit(
             f"[ABORTADO] MT5_CLONES_DIR '{clones_dir}' coincide con la carpeta de "
-            f"produccion {CLONES_PRODUCCION} o la contiene.")
+            f"produccion {CLONES_PRODUCCION}, la contiene o esta dentro de ella.")
+    if not str(args.login).isdigit():
+        raise SystemExit(f"[ABORTADO] --login debe ser numerico (recibido: {args.login!r}).")
     registro = load_registry()
     bots = parse_bots(args.bots)
     validate_instance(registro, bots, os.environ)
