@@ -44,7 +44,7 @@ def main():
     from motor import config
     if not config.LOCAL_PG_DSN:
         raise SystemExit("Falta LOCAL_PG_DSN: no hay base local que migrar.")
-    conn = psycopg2.connect(config.LOCAL_PG_DSN)
+    conn = psycopg2.connect(config.LOCAL_PG_DSN, connect_timeout=5)
     try:
         hechas = apply_pending(conn, MIGRATIONS_DIR)
     finally:

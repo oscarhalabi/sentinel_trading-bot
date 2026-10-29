@@ -3,12 +3,30 @@ import os
 
 import pytest
 
+from motor import config
 from motor.localdb import LocalDB
 from scripts import localdb_migrate
 
 MIGRACIONES = os.path.join(os.path.dirname(os.path.dirname(__file__)),
                            "localdb", "migrations")
 DSN_TEST = os.environ.get("LOCAL_PG_DSN_TEST", "")
+
+def _es_dsn_de_test(dsn):
+    """True solo si la base se llama *_test (el fixture borra tablas)."""
+    try:
+        from psycopg2.extensions import parse_dsn
+        return parse_dsn(dsn).get("dbname", "").endswith("_test")
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def test_guarda_dsn_de_test():
+    assert _es_dsn_de_test("postgresql://u:p@localhost:5432/sentinel_n1_test")
+    assert not _es_dsn_de_test("postgresql://u:p@localhost:5432/sentinel_n1")
+    assert _es_dsn_de_test("host=localhost dbname=sentinel_n1_test user=u")
+    assert not _es_dsn_de_test("host=localhost dbname=sentinel_n1 user=u")
+    assert not _es_dsn_de_test("basura")
+
 
 necesita_pg = pytest.mark.skipif(not DSN_TEST, reason="falta LOCAL_PG_DSN_TEST")
 
@@ -38,6 +56,8 @@ def test_pending_versions_orden_y_filtro():
 @pytest.fixture
 def conn_limpia():
     import psycopg2
+    if not _es_dsn_de_test(DSN_TEST) or DSN_TEST == config.LOCAL_PG_DSN:
+        pytest.fail("LOCAL_PG_DSN_TEST debe apuntar a una base *_test distinta de LOCAL_PG_DSN")
     conn = psycopg2.connect(DSN_TEST)
     with conn, conn.cursor() as cur:
         cur.execute("drop table if exists engine_events, schema_migrations cascade")
@@ -63,3 +83,20 @@ def test_record_event_inserta(conn_limpia):
         cur.execute("select kind, payload->>'x', bot_id from engine_events")
         fila = cur.fetchone()
     assert fila[0] == "prueba" and fila[1] == "1" and fila[2]
+
+
+def test_record_event_fallido_avisa_una_vez():
+    class Log:
+        def __init__(self): self.n = 0
+        def write(self, *a, **k): self.n += 1
+
+    class ConnRota:
+        def cursor(self): raise RuntimeError("caida")
+        def rollback(self): pass
+
+    log = Log()
+    db = LocalDB("x", log)
+    db.conn = ConnRota()
+    db.record_event("a", {})
+    db.record_event("b", {})
+    assert db.ok is False and log.n == 1
