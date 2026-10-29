@@ -22,6 +22,7 @@ import MetaTrader5 as mt5
 from . import config, notify, registry
 from .broker import Broker
 from .db import Database
+from .localdb import LocalDB
 from .logger import Logger
 
 
@@ -127,6 +128,12 @@ def setup(logger=None, engine_cls=None):
             db.upsert_positions([_closed_position_row(broker, t) for t in stale_tickets])
     except Exception:  # noqa: BLE001
         pass
+
+    # Postgres local: opcional y best-effort; nunca impide el arranque.
+    engine.localdb = LocalDB(config.LOCAL_PG_DSN)
+    if not engine.localdb.connect():
+        motivo = "no hay LOCAL_PG_DSN" if not config.LOCAL_PG_DSN else "no se pudo conectar"
+        logger.write("SYSTEM", f"AVISO: base local desactivada ({motivo}). El bot sigue sin ella.")
 
     who = engine.user_email or config.USER_ID
     logger.write("SYSTEM",
@@ -483,7 +490,9 @@ def trading_loop(db, engine, logger, stop_event=None):
             time.sleep(2)
 
 
-def shutdown(db):
+def shutdown(db, localdb=None):
+    if localdb is not None:
+        localdb.close()
     db.report("STOPPED")  # best-effort: marca offline antes de cerrar el flusher
     db.close()
     mt5.shutdown()
@@ -498,5 +507,5 @@ def run(engine_cls=None):
         pass
     finally:
         logger.write("SYSTEM", "Detencion manual solicitada.")
-        shutdown(db)
+        shutdown(db, engine.localdb)
 

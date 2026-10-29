@@ -357,7 +357,7 @@ def run_tui(engine_cls=None):
     finally:
         stop_event.set()
         worker.join(timeout=2)
-        botmain.shutdown(db)
+        botmain.shutdown(db, getattr(engine, 'localdb', None))
         console.print("Bot detenido.")
 
 

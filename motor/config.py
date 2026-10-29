@@ -34,6 +34,10 @@ _load_dotenv()
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 
+# Postgres local (opcional). Vacio = base local desactivada; el bot sigue igual.
+# Ej.: postgresql://sentinel_n1:<pass>@localhost:5432/sentinel_n1
+LOCAL_PG_DSN = os.environ.get("LOCAL_PG_DSN", "")
+
 # ==================================================================
 # MERCADO / IDENTIDAD  (por-instancia via entorno)
 # ==================================================================

@@ -1,6 +1,6 @@
 MetaTrader5
 supabase              # cliente cloud (REST/PostgREST) del runtime del bot
-psycopg2-binary       # solo scripts de migracion desde el Postgres local (legacy)
+psycopg2-binary       # Postgres local (motor/localdb.py y scripts/localdb_migrate.py)
 pandas
 numpy
 rich

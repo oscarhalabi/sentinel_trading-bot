@@ -57,7 +57,7 @@ def run_lite(engine_cls=None):
         pass
     finally:
         logger.write("SYSTEM", "Detencion manual solicitada.")
-        botmain.shutdown(db)
+        botmain.shutdown(db, getattr(engine, 'localdb', None))
         print("Bot detenido.")
 
 
