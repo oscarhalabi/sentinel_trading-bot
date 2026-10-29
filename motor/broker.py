@@ -32,6 +32,10 @@ _RETCODE_AYUDA = {
 }
 
 
+class MT5NoDisponible(Exception):
+    """MT5 no respondio (terminal caido): el dato es desconocido, no vacio."""
+
+
 class Broker:
     def __init__(self, logger, shadow=False, risk_guard: AccountRiskGuard | None = None,
                  symbols: tuple[str, ...] | None = None):
@@ -119,8 +123,11 @@ class Broker:
         todas = []
         for sym in self.symbols:
             pos = mt5.positions_get(symbol=sym)
-            if pos:
-                todas.extend(pos)
+            if pos is None:
+                # None = error de MT5 (terminal caido), NO "sin posiciones":
+                # () es lo que significa plano.
+                raise MT5NoDisponible(f"positions_get({sym}) fallo: {mt5.last_error()}")
+            todas.extend(pos)
         return todas
 
     def positions_of_magic(self, magic):

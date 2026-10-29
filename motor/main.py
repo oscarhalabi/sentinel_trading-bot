@@ -21,7 +21,7 @@ import time
 import MetaTrader5 as mt5
 
 from . import config, notify, registry
-from .broker import Broker
+from .broker import Broker, MT5NoDisponible
 from .db import Database
 from .localdb import LocalDB
 from .logger import Logger
@@ -158,6 +158,14 @@ def setup(logger=None, engine_cls=None):
     return db, broker, engine, logger
 
 
+def _mt5_vivo():
+    """Sondeo directo y barato: el terminal y la cuenta responden."""
+    try:
+        return mt5.terminal_info() is not None and mt5.account_info() is not None
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def _reseleccionar_simbolos(engine):
     """Tras reconectar MT5, vuelve a seleccionar los simbolos en Market Watch."""
     for sym in getattr(engine, "symbols", []) or []:
@@ -170,6 +178,8 @@ def _bot_status(engine):
         return "RUNNING"
     try:
         has_pos = len(engine.b.positions()) > 0
+    except MT5NoDisponible:
+        return "MT5_DOWN"
     except Exception:  # noqa: BLE001
         has_pos = True  # ante duda, asumimos que aun gestiona
     return "CLOSE_ONLY" if has_pos else "FLAT"
@@ -418,6 +428,14 @@ def trading_loop(db, engine, logger, stop_event=None):
                     # Sin MT5 positions() devuelve [] y close_all creeria que ya
                     # esta plano: se consumiria la orden sin cerrar nada. Se deja
                     # la bandera puesta hasta que vuelva el terminal.
+                    if not aviso_force_close:
+                        logger.write("SYSTEM", "CIERRE FORZADO en espera: MT5 no responde; "
+                                               "se ejecuta en cuanto vuelva el terminal.")
+                        aviso_force_close = True
+                elif inst.get("force_close") and not _mt5_vivo():
+                    # El estado del vigilante puede tener hasta un latido de
+                    # retraso: sondeo directo justo antes de consumir la orden.
+                    mt5_estado = "RECONNECTING"
                     if not aviso_force_close:
                         logger.write("SYSTEM", "CIERRE FORZADO en espera: MT5 no responde; "
                                                "se ejecuta en cuanto vuelva el terminal.")

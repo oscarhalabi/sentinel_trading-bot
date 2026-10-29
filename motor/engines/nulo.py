@@ -8,6 +8,7 @@ Es la interfaz minima que main.setup / main.trading_loop esperan de un motor.
 import time
 
 from motor import config
+from motor.broker import MT5NoDisponible
 
 LATIDO_SEGUNDOS = 60
 
@@ -39,6 +40,9 @@ class NullEngine:
 
     def close_all(self, reason):
         """Cierra las posiciones de su magic. True cuando no queda ninguna."""
-        for p in self.b.positions():
-            self.b.close_position(p, reason)
-        return not self.b.positions()
+        try:
+            for p in self.b.positions():
+                self.b.close_position(p, reason)
+            return not self.b.positions()
+        except MT5NoDisponible:
+            return False  # sin MT5 no se sabe si quedo plano: no dar por cerrado

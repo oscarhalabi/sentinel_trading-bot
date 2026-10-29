@@ -28,6 +28,7 @@ def _entorno(monkeypatch, instancia=None):
     monkeypatch.setattr(botmain.mt5, "account_info", lambda: None)
     monkeypatch.setattr(botmain, "_publish_candles", lambda db, n: None)
     _watch(monkeypatch, "OK")
+    monkeypatch.setattr(botmain, "_mt5_vivo", lambda: True)
 
 
 def _watch(monkeypatch, *estados):
@@ -224,3 +225,58 @@ def test_motivo_salida_distingue_give_up():
     except SystemExit:
         assert "MT5" in botmain._motivo_salida()
     assert "manual" in botmain._motivo_salida()
+
+
+def test_force_close_no_se_consume_si_mt5_muere_entre_latidos(monkeypatch):
+    """El vigilante dijo OK en el ultimo latido, pero el terminal murio despues."""
+    _entorno(monkeypatch)
+    monkeypatch.setattr(config, "HEARTBEAT_INTERVAL", 10 ** 9)   # un solo latido
+    _watch(monkeypatch, "OK")
+    vivo = {"v": True}
+    monkeypatch.setattr(botmain, "_mt5_vivo", lambda: vivo["v"])
+    # Primer ciclo (latido) sin orden; luego muere MT5 y llega force_close.
+    db = _doble_db({}, instancias=[{}, {"force_close": True}, {"force_close": True}])
+    engine = _doble_engine(close_all=[True])
+
+    class MuereTras:
+        n = 0
+
+        def is_set(self):
+            MuereTras.n += 1
+            if MuereTras.n == 2:
+                vivo["v"] = False
+            if MuereTras.n == 4:
+                vivo["v"] = True
+            return MuereTras.n > 4
+
+    botmain.trading_loop(db, engine, MagicMock(), MuereTras())
+    # Ciclos 2 y 3 con MT5 muerto: no se consume. Ciclo 4 ya vivo, pero el estado
+    # quedo en RECONNECTING hasta el proximo latido, asi que sigue en espera.
+    assert not db.clear_force_close.called
+    assert not engine.close_all.called
+
+
+def test_nulo_close_all_false_si_mt5_no_disponible():
+    from motor.broker import MT5NoDisponible
+    broker = MagicMock()
+    broker.positions.side_effect = MT5NoDisponible("x")
+    assert NullEngine(broker, MagicMock()).close_all("x") is False
+
+
+def test_bot_status_mt5_down_si_positions_no_disponible():
+    from motor.broker import MT5NoDisponible
+    engine = MagicMock()
+    engine.close_only = True
+    engine.b.positions.side_effect = MT5NoDisponible("x")
+    assert botmain._bot_status(engine) == "MT5_DOWN"
+
+
+def test_positions_all_none_es_error_y_vacio_es_plano(monkeypatch):
+    from motor import broker as brk
+    b = brk.Broker(MagicMock(), shadow=True, symbols=("XAUUSD",))
+    monkeypatch.setattr(brk.mt5, "last_error", lambda: (1, "x"))
+    monkeypatch.setattr(brk.mt5, "positions_get", lambda symbol=None: None)
+    with pytest.raises(brk.MT5NoDisponible):
+        b.positions_all()
+    monkeypatch.setattr(brk.mt5, "positions_get", lambda symbol=None: ())
+    assert b.positions_all() == []
