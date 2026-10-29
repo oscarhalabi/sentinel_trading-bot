@@ -1,6 +1,6 @@
-"""Vigilante: relanza los motores nuevos que se hayan caido.
+r"""Vigilante: relanza los motores nuevos que se hayan caido.
 
-Compara los motores que DEBERIAN estar corriendo (cada instances\*.env con
+Compara los motores que DEBERIAN estar corriendo (cada instances*.env con
 BOTS=...) con los que estan corriendo de verdad (lanzadores run_motor.ps1 de
 este repo) y abre en una ventana nueva los que faltan.
 
@@ -13,7 +13,7 @@ pararlo de forma permanente, quitalo de BOTS o apagalo desde el dashboard
 
 Limite anti-bucle: si un motor se ha relanzado 5 veces en 30 minutos (suele ser
 que se cae al arrancar), el vigilante deja de relanzarlo y lo registra como
-[ERROR] hasta que pase la ventana. El estado va en logs\vigilante_estado.json.
+[ERROR] hasta que pase la ventana. El estado va en logsigilante_estado.json.
 
 Uso:  python -m scripts.vigilante [--dry-run] [--instances DIR]
 """
