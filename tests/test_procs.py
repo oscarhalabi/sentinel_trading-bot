@@ -109,3 +109,12 @@ def test_marca_python_exige_fin_de_palabra():
 def test_motor_run_sin_ruta_del_repo_no_se_selecciona():
     prod = Proc(1, "python.exe", "python -m motor.run --mode lite", "")
     assert select_ours([prod], REPO, CLONES) == []
+
+
+def test_vigilante_de_la_tarea_programada_incluido():
+    # Linea de comandos que registra instalar_tareas.ps1 (pythonw, --root con la ruta).
+    p = Proc(1, "pythonw.exe",
+             rf'"C:\Python\pythonw.exe" -m scripts.vigilante --root "{REPO}"', "")
+    assert select_ours([p], REPO, CLONES) == [p]
+    sin_root = Proc(2, "pythonw.exe", r'"C:\Python\pythonw.exe" -m scripts.vigilante', "")
+    assert select_ours([sin_root], REPO, CLONES) == []

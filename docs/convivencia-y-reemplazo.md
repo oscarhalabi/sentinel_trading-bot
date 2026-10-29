@@ -38,6 +38,13 @@ Cómo se garantiza que nuestros scripts no tocan producción:
 - **Se niega a trabajar** si `MT5_CLONES_DIR` coincide con `C:\MT5_instances`, la contiene o
   está dentro de ella (`select_ours` y `provision alta` abortan).
 - `motor.registry` rechaza un magic nuestro que choque con `MAGIC_M15`/`MAGIC_M5`/`MAGIC_E2`.
+  Si el `.env` no los trae, compara con los valores por defecto de producción (100100, 100200
+  y 100300).
+- Un usuario de Supabase que ya tenga instancias de producción (`bot_id` que no está en
+  `motor/engines.json`, p.ej. `m15`, `m5`, `e2`) se rechaza: `provision alta` aborta antes de
+  escribir nada y el motor no arranca.
+- Un solo motor por usuario y `bot_id`: `motor.run` toma un candado (mutex de Windows) al
+  arrancar; si ya lo tiene otro proceso, sale sin operar (código 0).
 - `scripts\instalar_tareas.ps1` solo toca la tarea `SentinelN1Vigilante`.
 - Antes de reiniciar, `restart_motor.ps1 -DryRun` muestra qué mataría. En la verificación de la
   Fase 1 debe listar **cero** procesos de producción.
@@ -57,6 +64,10 @@ modifica, así que el bot nuevo se defiende solo:
   fallidos intenta reconectar (esperas de 5, 15, 30 y 60 s) y mientras tanto no opera. Si en
   unos 5 minutos (`MT5_GIVEUP_S`, aprox.: se evalúa en cada latido) no lo logra, sale con código 3 y es el vigilante quien lo
   vuelve a levantar.
+- Cómo ve el vigilante si un motor está vivo: por el PowerShell de `run_motor.ps1`. Un motor que
+  se cae con error se relanza (`run_motor.ps1` cierra su PowerShell aunque se abriera con
+  `-NoExit`). Un motor detenido limpiamente en una ventana `-NoExit` no se relanza hasta cerrar
+  esa ventana.
 
 Consecuencia práctica: si un motor "desaparece" por unos minutos justo después de un alta en
 producción, es normal. Si pasa seguido, avisar a Daniel.

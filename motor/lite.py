@@ -16,7 +16,7 @@ Los eventos ERROR si se imprimen (son raros y baratos): si una instancia se
 atasca, la ventana lo muestra sin tener que abrir el CSV.
 
 Uso:                 python -m motor.run --mode lite
-Uso (via launcher):  scripts\\run_instance.ps1 instances\\<usuario>.env -Lite
+Uso (via launcher):  scripts\\run_motor.ps1 -EnvFile instances\\<usuario>.env -BotId n1 -Mode lite
 """
 
 from . import config, main as botmain

@@ -18,7 +18,7 @@ from dataclasses import asdict, dataclass
 CLONES_POR_DEFECTO = r"C:\MT5_instances_n1"
 
 # Un proceso python es nuestro si su linea de comandos lleva alguna de estas marcas
-# Y la ruta de este repo.
+# Y la ruta de este repo (motor.run y scripts.vigilante la llevan en --root).
 # Se exige "-m <modulo>" seguido de fin de palabra: motor.runner o un pytest que
 # solo menciona motor.run no cuentan.
 MARCAS_PYTHON = (re.compile(r"-m\s+motor\.run(?![\w.])"),

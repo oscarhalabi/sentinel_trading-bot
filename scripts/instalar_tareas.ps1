@@ -3,7 +3,7 @@
     Registra (o quita) la tarea programada propia del bot nuevo: SentinelN1Vigilante.
 
 .DESCRIPTION
-    SentinelN1Vigilante ejecuta "python -m scripts.vigilante" cada 3 minutos, en la
+    SentinelN1Vigilante ejecuta "python -m scripts.vigilante --root <repo>" cada 3 minutos, en la
     sesion interactiva del operador (los motores que relance abren su ventana ahi).
 
     - Es idempotente: ejecutarlo otra vez reemplaza solo esa tarea.
@@ -46,7 +46,10 @@ $py = Get-Command pythonw -ErrorAction SilentlyContinue
 if ($null -eq $py) { $py = Get-Command python -ErrorAction SilentlyContinue }
 if ($null -eq $py) { Write-Host "  [FALLO] python no esta en el PATH."; exit 1 }
 
-$accion = New-ScheduledTaskAction -Execute $py.Source -Argument "-m scripts.vigilante" -WorkingDirectory $projectRoot
+# --root lleva la ruta del repo en la linea de comandos: asi restart_motor.ps1
+# (select_ours) reconoce al vigilante como propio.
+$argumentos = "-m scripts.vigilante --root `"$projectRoot`""
+$accion = New-ScheduledTaskAction -Execute $py.Source -Argument $argumentos -WorkingDirectory $projectRoot
 $inicio = (Get-Date).AddMinutes(1)
 $disparador = New-ScheduledTaskTrigger -Once -At $inicio -RepetitionInterval (New-TimeSpan -Minutes 3)
 # Interactive: corre en la sesion abierta del operador (necesita estar conectado).
@@ -56,7 +59,7 @@ $ajustes = New-ScheduledTaskSettingsSet -StartWhenAvailable -MultipleInstances I
 
 if ($DryRun) {
     Write-Host "  [DryRun] se registraria $NombreTarea (reemplaza solo esa tarea si ya existe):"
-    Write-Host "           ejecuta : $($py.Source) -m scripts.vigilante"
+    Write-Host "           ejecuta : $($py.Source) $argumentos"
     Write-Host "           carpeta : $projectRoot"
     Write-Host "           cada    : 3 minutos, sesion interactiva de $usuario"
     exit 0

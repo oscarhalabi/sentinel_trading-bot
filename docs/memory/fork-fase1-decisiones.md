@@ -35,6 +35,15 @@ Guías: `docs/como-funciona.md` y `docs/convivencia-y-reemplazo.md`.
   se aplican con `python -m scripts.localdb_migrate`. El sincronizador a Supabase y el "local-primero"
   completo quedan para la Fase 5.
 - **Punto de enchufe de riesgo** `motor/risk.py::AccountRiskGuard` (hoy siempre permite).
+- **Aparcado para la Fase 5 (spec 7.5):** "si el Postgres local falla, el bot no abre operaciones
+  nuevas". En la Fase 1 la base local es best-effort y no bloquea nada (los motores son nulos y no
+  abren). Cuando haya motores que operen, se engancha en `AccountRiskGuard`: negar aperturas si
+  `engine.localdb` no está conectada.
+- **Guardas añadidas en la revisión final:** un motor por (`USER_ID`, `BOT_ID`) con candado en
+  `motor.run`; un usuario con instancias de producción se rechaza (`registry.assert_usuario_propio`,
+  en `provision alta` y al arrancar); `run_motor.ps1` cierra su ventana si python sale con error
+  para que el vigilante lo vea caído; los magics de producción por defecto (100100/100200/100300)
+  cuentan aunque el `.env` no los traiga.
 - **Etiquetas de operación** por `comment` `ETIQUETA|texto` (ver [[logging-taxonomy-and-ticket]]).
 - **Memoria y skills en el repo:** `docs/memory/` y `.claude/skills/` (4 skills iniciales).
 - **Limpieza de memoria:** se borraron las notas de estrategia vieja (Healer, Hedge, OP1-OP4, M5 v2,

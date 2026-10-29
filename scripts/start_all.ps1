@@ -121,8 +121,12 @@ Write-Ok "dependencias presentes"
 
 if (-not (Test-Path $InstancesDir)) { Write-Fail "no existe $InstancesDir"; exit 1 }
 
-$envFiles = Get-ChildItem -Path $InstancesDir -Filter "*.env" |
-    Where-Object { $_.Name -notlike "example*" -and $_.Name -notlike "template*" -and $_.Name -notlike "_*" }
+# Que .env son instancias lo decide una sola regla en Python (la misma que usa
+# el vigilante): se saltan example*, template* y _*.
+$listado = Invoke-PyCapture @("-m", "motor.registry", "list", $InstancesDir)
+if ($script:PyExit -ne 0) { Write-Fail "no se pudo listar las instancias: $listado"; exit 1 }
+$envFiles = @($listado -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ } |
+    ForEach-Object { Get-Item -LiteralPath $_ })
 if (-not $envFiles) {
     Write-Fail "no hay instancias en $InstancesDir (solo plantillas)."
     Write-Host "         Copia instances\example.env a instances\<usuario>.env y rellenalo." -ForegroundColor DarkGray

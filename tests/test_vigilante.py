@@ -31,6 +31,9 @@ def test_vigilante_relanza_faltantes(tmp_path):
 def test_ignora_example_env(tmp_path):
     _env(tmp_path, "example.env", "BOTS=n1\n")
     _env(tmp_path, "_borrador.env", "BOTS=n1\n")
+    # Misma regla que start_all.ps1 (motor.registry list): example*, template*, _*.
+    _env(tmp_path, "Example-m5.env", "BOTS=n1\n")
+    _env(tmp_path, "template_daniel.env", "BOTS=n1\n")
     assert expected_instances(str(tmp_path)) == set()
 
 
@@ -100,3 +103,20 @@ def test_main_tope_de_reintentos(tmp_path, monkeypatch):
         json.dumps({clave: [time.time() - 60 * i for i in range(1, 6)]}))
     v.main(["--instances", str(tmp_path)])
     assert llamadas == []
+
+
+def test_main_root_valido_e_invalido(tmp_path, monkeypatch):
+    import pytest
+    v, _, _ = _preparar(tmp_path, monkeypatch)
+    assert v.main(["--dry-run", "--root", str(tmp_path).upper(), "--instances", str(tmp_path)]) == 0
+    with pytest.raises(SystemExit):
+        v.main(["--dry-run", "--root", str(tmp_path / "otro"), "--instances", str(tmp_path)])
+
+
+def test_tarea_programada_pasa_root():
+    import os
+    ruta = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "scripts", "instalar_tareas.ps1")
+    with open(ruta, encoding="utf-8") as f:
+        texto = f.read()
+    assert '-m scripts.vigilante --root' in texto

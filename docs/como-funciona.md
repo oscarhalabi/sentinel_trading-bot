@@ -21,6 +21,10 @@ Explicado sin jerga. Para el plan de convivencia con producción ve a
   deberían estar vivos y relanza los que falten. Además, cada motor reconecta MT5 por sí solo
   si el terminal deja de responder (y si no lo logra en unos 5 minutos, sale para que lo relance el vigilante).
   Mientras MT5 no responde, el motor no opera y reporta `bot_status = MT5_DOWN` (la app web puede mostrarlo).
+  Un motor que se cae con error se relanza (su ventana se cierra sola). Un motor detenido
+  limpiamente (Ctrl+C) en una ventana abierta por `start_all` no se relanza hasta cerrar esa ventana.
+  Nunca corren dos motores iguales (mismo usuario y mismo `bot_id`): el segundo ve que ya hay
+  uno y sale sin operar.
 - **El servidor (VPS)**: el Windows donde corre todo, incluido el bot de producción (e2),
   que **no** es parte de este repo.
 

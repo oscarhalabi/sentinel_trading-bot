@@ -10,6 +10,8 @@
     pregunta a "python -m scripts.procs list --json" (funcion select_ours) y mata
     unicamente lo que devuelve:
       - python con motor.run / scripts.vigilante que lleven la ruta de ESTE repo
+        (run_motor.ps1 y la tarea SentinelN1Vigilante pasan siempre --root <repo>;
+        asi un vigilante a medio relanzar se corta y no compite con este reinicio)
       - powershell con run_motor.ps1 de ESTE repo
       - terminal64.exe bajo MT5_CLONES_DIR (por defecto C:\MT5_instances_n1)
     Los procesos de produccion (bot.lite_e2, news_exporter y los terminales de

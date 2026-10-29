@@ -7,19 +7,32 @@ este repo) y abre en una ventana nueva los que faltan.
 Solo mira procesos de este repo (scripts.procs.select_ours): nunca toca
 produccion. Pensado para la tarea programada SentinelN1Vigilante.
 
-Un motor parado a mano se relanza mientras su .env lo liste en BOTS. Para
-pararlo de forma permanente, quitalo de BOTS o apagalo desde el dashboard
-(is_active=false lo deja vivo en modo solo-cerrar).
+Que cuenta como "corriendo": el proceso de PowerShell de run_motor.ps1 con ese
+-EnvFile y -BotId. Por eso:
+  - Un motor que se cae con error (python sale con codigo distinto de 0) se
+    relanza: run_motor.ps1 cierra tambien su PowerShell, aunque se abriera con
+    -NoExit (start_all.ps1).
+  - Un motor detenido limpiamente (Ctrl+C, codigo 0) en una ventana -NoExit NO
+    se relanza hasta que se cierre esa ventana: el PowerShell sigue vivo.
+  - Un motor lanzado con el PowerShell cerrado (o lanzado por el propio
+    vigilante, sin -NoExit) se relanza mientras su .env lo liste en BOTS.
+Para pararlo de forma permanente, quitalo de BOTS o apagalo desde el dashboard
+(is_active=false lo deja vivo en modo solo-cerrar). Si por error se lanzan dos
+motores iguales (mismo USER_ID y BOT_ID), el segundo ve el candado de motor.run
+y sale sin operar.
 
 Limite anti-bucle: si un motor se ha relanzado 5 veces en 30 minutos (suele ser
 que se cae al arrancar), el vigilante deja de relanzarlo y lo registra como
 [ERROR] hasta que pase la ventana. El estado va en logs\vigilante_estado.json.
 
-Uso:  python -m scripts.vigilante [--dry-run] [--instances DIR]
+Uso:  python -m scripts.vigilante [--dry-run] [--instances DIR] [--root <ruta del repo>]
+
+--root es solo una marca en la linea de comandos (como en motor.run): con ella
+restart_motor.ps1 reconoce al vigilante como proceso de este repo. La tarea
+SentinelN1Vigilante siempre la pasa.
 """
 
 import argparse
-import glob
 import json
 import os
 import re
@@ -28,7 +41,7 @@ import sys
 import time
 from datetime import datetime
 
-from motor.registry import load_registry, parse_bots, read_env_file
+from motor.registry import instance_env_files, load_registry, parse_bots, read_env_file
 from scripts.procs import (CLONES_POR_DEFECTO, Proc, _raiz_repo, list_processes,
                            select_ours)
 
@@ -51,17 +64,17 @@ def _log(msg: str, log_path: str | None) -> None:
 
 
 def expected_instances(instances_dir: str, log_path: str | None = None) -> set[tuple[str, str]]:
-    """Pares (env_path, bot_id) de los .env con BOTS. Salta example.env y los que empiezan por '_'.
+    """Pares (env_path, bot_id) de los .env con BOTS.
+
+    Salta plantillas y borradores (example*, template*, _*) con la misma regla
+    que start_all.ps1: motor.registry.instance_env_files.
 
     Un .env roto (sin BOTS, vacio o con un motor que no existe) se avisa en el
     log y se salta: no tumba al vigilante.
     """
     registro = load_registry()
     pares: set[tuple[str, str]] = set()
-    for ruta in sorted(glob.glob(os.path.join(instances_dir, "*.env"))):
-        nombre = os.path.basename(ruta).lower()
-        if nombre == "example.env" or nombre.startswith("_"):
-            continue
+    for ruta in instance_env_files(instances_dir):
         try:
             bots = parse_bots(read_env_file(ruta).get("BOTS"))
         except (SystemExit, OSError) as e:
@@ -134,9 +147,14 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="scripts.vigilante")
     parser.add_argument("--dry-run", action="store_true", help="solo loguea, no lanza nada")
     parser.add_argument("--instances", default=None, help="carpeta con los .env (por defecto instances)")
+    parser.add_argument("--root", default=None,
+                        help="ruta absoluta de la raiz del repo (marca para identificar el proceso)")
     args = parser.parse_args(argv)
 
     repo = _raiz_repo()
+    if args.root is not None and (os.path.normcase(os.path.realpath(args.root))
+                                  != os.path.normcase(os.path.realpath(repo))):
+        raise SystemExit(f"[ABORTADO] --root '{args.root}' no es la raiz de este repo ({repo}).")
     log_path = os.path.join(repo, "logs", "vigilante.log")
     instancias = args.instances or os.path.join(repo, "instances")
     clones = os.environ.get("MT5_CLONES_DIR") or CLONES_POR_DEFECTO
