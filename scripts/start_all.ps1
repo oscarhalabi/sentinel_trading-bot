@@ -76,6 +76,22 @@ function Read-EnvFile($path) {
     return $map
 }
 
+# Ejecuta python capturando stdout+stderr SIN que stderr aborte el script:
+# en PowerShell 5.1, con ErrorActionPreference=Stop, cualquier linea por stderr
+# de un exe nativo con 2>&1 se convierte en error terminante. Devuelve el texto y
+# deja el codigo de salida en $script:PyExit.
+function Invoke-PyCapture([string[]]$PyArgs) {
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $out = & python @PyArgs 2>&1 | ForEach-Object { "$_" }
+        $script:PyExit = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $prevEap
+    }
+    return ($out -join "`n")
+}
+
 Set-Location $projectRoot
 Write-Host ""
 Write-Host "  SENTINEL (bot nuevo) - arranque completo" -ForegroundColor White
@@ -117,8 +133,8 @@ $aLanzar = @()
 $hardFail = $false
 foreach ($f in $envFiles) {
     # Valida BOTS (conocidos), magics distintos y sin chocar con produccion.
-    $salida = python -m motor.registry check $f.FullName 2>&1
-    if ($LASTEXITCODE -ne 0) {
+    $salida = Invoke-PyCapture @("-m", "motor.registry", "check", $f.FullName)
+    if ($script:PyExit -ne 0) {
         Write-Fail "$($f.Name): $salida"
         $hardFail = $true
         continue
@@ -153,6 +169,31 @@ if ($SkipTests) {
 # FASE 3 - LANZAMIENTO
 # ==================================================================
 Write-Phase 3 "LANZAMIENTO"
+
+# Evita motores duplicados (mismo .env y mismo motor, mismo magic): si ya hay un
+# run_motor.ps1 corriendo con ese EnvFile y BotId, se salta con un aviso.
+$yaCorriendo = @()
+$json = Invoke-PyCapture @("-m", "scripts.procs", "list", "--json")
+if ($script:PyExit -eq 0 -and $json) {
+    try { $yaCorriendo = @((ConvertFrom-Json $json) | Where-Object { $_ }) } catch { $yaCorriendo = @() }
+} elseif ($script:PyExit -ne 0) {
+    Write-Warn "no se pudo comprobar los motores ya en marcha: $json"
+}
+function Test-YaCorriendo($inst) {
+    $envNorm = $inst.Path.Replace("/", "\").ToLower()
+    foreach ($p in $yaCorriendo) {
+        if ($p.name -notmatch "^(?i:powershell|pwsh)") { continue }
+        $cmd = ([string]$p.cmdline).Replace("/", "\").ToLower()
+        if ($cmd.Contains("run_motor.ps1") -and $cmd.Contains($envNorm) -and
+            $cmd -match ("-botid\s+`"?" + [regex]::Escape($inst.BotId) + "(?![\w.-])")) { return $true }
+    }
+    return $false
+}
+$omitidos = @($aLanzar | Where-Object { Test-YaCorriendo $_ })
+foreach ($o in $omitidos) {
+    Write-Warn "motor $($o.BotId) ($($o.Name)) ya esta en marcha: se omite para no duplicarlo."
+}
+$aLanzar = @($aLanzar | Where-Object { -not (Test-YaCorriendo $_) })
 
 if ($DryRun) {
     Write-Warn "-DryRun: no se lanza nada. Se habrian abierto:"

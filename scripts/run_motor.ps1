@@ -67,12 +67,18 @@ Set-Location $projectRoot
 # --- Identidad del motor -------------------------------------------------
 $BotId = $BotId.Trim().ToLower()
 $env:BOT_ID = $BotId
-$magic = (python -m motor.registry magic $BotId)
-if ($LASTEXITCODE -ne 0) {
+# stderr de python no debe abortar el script (PS 5.1 + Stop): se captura aparte.
+$prevEap = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+$magic = (& python -m motor.registry magic $BotId 2>&1 | ForEach-Object { "$_" })
+$magicExit = $LASTEXITCODE
+$ErrorActionPreference = $prevEap
+if ($magicExit -ne 0) {
+    Write-Host "$magic" -ForegroundColor Red
     Write-Error "No se pudo obtener el magic de '$BotId' (ver motor\engines.json)."
     exit 1
 }
-$env:MAGIC_NUMBER = "$magic".Trim()
+$env:MAGIC_NUMBER = ("$magic" -split "\s+" | Where-Object { $_ } | Select-Object -Last 1)
 
 Write-Host "Arrancando $BotId | USER_ID=$env:USER_ID SYMBOL=$env:SYMBOL BOT_ID=$env:BOT_ID MAGIC=$env:MAGIC_NUMBER (modo: $Mode)" -ForegroundColor Cyan
 

@@ -19,8 +19,14 @@ CLONES_POR_DEFECTO = r"C:\MT5_instances_n1"
 
 # Un proceso python es nuestro si su linea de comandos lleva alguna de estas marcas
 # Y la ruta de este repo.
-MARCAS_PYTHON = ("motor.run", "scripts.vigilante")
-MARCAS_POWERSHELL = ("run_motor.ps1",)
+# Se exige "-m <modulo>" seguido de fin de palabra: motor.runner o un pytest que
+# solo menciona motor.run no cuentan.
+MARCAS_PYTHON = (re.compile(r"-m\s+motor\.run(?![\w.])"),
+                 re.compile(r"-m\s+scripts\.vigilante(?![\w.])"))
+MARCAS_POWERSHELL = (re.compile(r"run_motor\.ps1(?![\w.])"),)
+
+# Carpeta de los terminales de produccion: jamas es nuestra.
+CLONES_PRODUCCION = r"C:\MT5_instances"
 
 
 @dataclass
@@ -54,8 +60,22 @@ def _bajo_carpeta(exe: str, carpeta: str) -> bool:
     return bool(e) and bool(c) and e.startswith(c + "\\")
 
 
+def _es_o_contiene(carpeta: str, otra: str) -> bool:
+    """True si 'carpeta' es 'otra' o una carpeta padre de 'otra' (con limite de ruta)."""
+    c, o = _norm(carpeta), _norm(otra)
+    return o == c or o.startswith(c + "\\")
+
+
 def select_ours(procs: list[Proc], repo_root: str, clones_dir: str) -> list[Proc]:
-    """Filtra los procesos de este repo: motores, lanzadores y terminales MT5 propios."""
+    """Filtra los procesos de este repo: motores, lanzadores y terminales MT5 propios.
+
+    Aborta si clones_dir coincide con (o contiene) la carpeta de produccion.
+    """
+    if _es_o_contiene(clones_dir, CLONES_PRODUCCION):
+        raise SystemExit(
+            f"[ABORTADO] MT5_CLONES_DIR '{clones_dir}' coincide con la carpeta de "
+            f"produccion {CLONES_PRODUCCION} o la contiene."
+        )
     nuestros: list[Proc] = []
     for p in procs:
         nombre = p.name.lower()
@@ -65,12 +85,12 @@ def select_ours(procs: list[Proc], repo_root: str, clones_dir: str) -> list[Proc
         elif nombre.startswith(("powershell", "pwsh")):
             marcas = MARCAS_POWERSHELL
         elif nombre.startswith("terminal64"):
-            if _bajo_carpeta(p.exe, clones_dir):
+            if _bajo_carpeta(p.exe, clones_dir) and not _bajo_carpeta(p.exe, CLONES_PRODUCCION):
                 nuestros.append(p)
             continue
         else:
             continue
-        if any(m in cmd for m in marcas) and _contiene_ruta(p.cmdline, repo_root):
+        if any(m.search(cmd) for m in marcas) and _contiene_ruta(p.cmdline, repo_root):
             nuestros.append(p)
     return nuestros
 

@@ -44,7 +44,7 @@ def test_prefijos_de_carpeta_no_se_confunden():
     t_prod = Proc(1, "terminal64.exe", "", r"C:\MT5_instances\mt5_1\terminal64.exe")
     t_n1 = Proc(2, "terminal64.exe", "", r"C:\MT5_instances_n1\mt5_1\terminal64.exe")
     assert select_ours([t_prod, t_n1], REPO, CLONES) == [t_n1]
-    assert select_ours([t_prod, t_n1], REPO, r"C:\MT5_instances") == [t_prod]
+    assert select_ours([t_prod], REPO, CLONES) == []
 
 
 def test_repo_con_prefijo_parecido_no_coincide():
@@ -83,3 +83,29 @@ def test_registry_cli_check(tmp_path):
     vacio.write_text("USER_ID=x\n", encoding="utf-8")
     with pytest.raises(SystemExit):
         registry.main(["check", str(vacio)])
+
+
+# --- endurecimiento ---
+
+def test_clones_dir_de_produccion_se_rechaza():
+    import pytest
+    for malo in (r"C:\MT5_instances", r"c:/mt5_instances/", "C:\\"):
+        with pytest.raises(SystemExit):
+            select_ours([], REPO, malo)
+
+
+def test_terminal_de_produccion_nunca_se_selecciona():
+    # Aunque clones_dir fuera una subcarpeta de produccion, no se toca.
+    t = Proc(1, "terminal64.exe", "", r"C:\MT5_instances\mt5_1\terminal64.exe")
+    assert select_ours([t], REPO, r"C:\MT5_instances\sub") == []
+
+
+def test_marca_python_exige_fin_de_palabra():
+    runner = Proc(1, "python.exe", rf'python -m motor.runner --root "{REPO}"', "")
+    pytest_ = Proc(2, "python.exe", rf'python -m pytest -k motor.run "{REPO}\tests"', "")
+    assert select_ours([runner, pytest_], REPO, CLONES) == []
+
+
+def test_motor_run_sin_ruta_del_repo_no_se_selecciona():
+    prod = Proc(1, "python.exe", "python -m motor.run --mode lite", "")
+    assert select_ours([prod], REPO, CLONES) == []
