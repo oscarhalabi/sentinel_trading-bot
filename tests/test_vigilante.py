@@ -3,7 +3,7 @@
 from scripts.procs import Proc
 from scripts.vigilante import expected_instances, missing, running_instances
 
-REPO = r"C:\Users\Administrator\Documents\sentinel_trading-bot-fase1"
+REPO = r"C:\Users\Administrator\Documents\sentinel_trading-bot"
 RUNNER = REPO + r"\scripts\run_motor.ps1"
 
 

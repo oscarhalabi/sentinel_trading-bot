@@ -2,7 +2,7 @@
 
 from scripts.procs import Proc, select_ours
 
-REPO = r"C:\Users\Administrator\Documents\sentinel_trading-bot-fase1"
+REPO = r"C:\Users\Administrator\Documents\sentinel_trading-bot"
 PROD = r"C:\Users\Administrator\Documents\sentinel_trading"
 CLONES = r"C:\MT5_instances_n1"
 
@@ -24,7 +24,7 @@ def test_seleccion_ignora_produccion():
 
 def test_rutas_case_insensitive():
     procs = [
-        Proc(1, "python.exe", "python -m motor.run --mode lite --root c:/users/administrator/documents/SENTINEL_TRADING-BOT-FASE1", ""),
+        Proc(1, "python.exe", "python -m motor.run --mode lite --root c:/users/administrator/documents/SENTINEL_TRADING-BOT", ""),
         Proc(2, "terminal64.exe", "", r"c:\mt5_instances_N1\mt5_9\TERMINAL64.EXE"),
     ]
     assert sorted(p.pid for p in select_ours(procs, REPO, CLONES)) == [1, 2]
