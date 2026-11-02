@@ -39,10 +39,17 @@ class NullEngine:
             self.logger.write("SYSTEM", "Motor nulo vivo")
 
     def close_all(self, reason):
-        """Cierra las posiciones de su magic. True cuando no queda ninguna."""
+        """Cierra las posiciones de su magic. True cuando no queda ninguna.
+
+        En modo sombra no se envian ordenes: se registra que se cerraria cada
+        posicion y se da el cierre por hecho (si no, el cierre forzado nunca se
+        consumiria y se reintentaria cada 3 s para siempre).
+        """
         try:
             for p in self.b.positions():
-                self.b.close_position(p, reason)
+                self.b.close_position(p, reason)   # en sombra el broker solo lo registra
+            if self.b.shadow is True:
+                return True
             return not self.b.positions()
         except MT5NoDisponible:
             return False  # sin MT5 no se sabe si quedo plano: no dar por cerrado

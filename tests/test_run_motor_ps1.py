@@ -12,7 +12,7 @@ def _bloque_de_salida():
     """Lo que run_motor.ps1 ejecuta justo despues de python -m motor.run."""
     with open(RUN_MOTOR, encoding="utf-8") as f:
         texto = f.read()
-    llamada = 'python -m motor.run --mode $Mode --root "$projectRoot"'
+    llamada = 'python -m motor.run --mode $Mode --root "$projectRoot" --env-file "$EnvFile" --bot-id $BotId'
     assert llamada in texto
     return texto.split(llamada, 1)[1]
 
@@ -56,3 +56,22 @@ def test_noexit_sigue_abierta_si_python_sale_limpio(tmp_path):
     finally:
         p.kill()  # proceso propio del test
         p.communicate()
+
+
+def test_run_motor_lee_el_env_como_utf8():
+    with open(RUN_MOTOR, encoding="utf-8") as f:
+        texto = f.read()
+    assert "Get-Content -LiteralPath $EnvFile -Encoding UTF8" in texto
+
+
+@pytest.mark.skipif(os.name != "nt", reason="solo Windows")
+def test_get_content_utf8_conserva_enie_y_euro(tmp_path):
+    """Mismo patron de lectura que run_motor.ps1, contra un .env UTF-8 sin BOM."""
+    env = tmp_path / "a.env"
+    env.write_bytes("MT5_PASSWORD=contraseña€\n".encode("utf-8"))
+    salida = tmp_path / "out.txt"
+    ps = (f"$v = @(Get-Content -LiteralPath '{env}' -Encoding UTF8)[0].Split('=',2)[1]; "
+          f"[IO.File]::WriteAllText('{salida}', $v, [Text.UTF8Encoding]::new($false))")
+    subprocess.run(["powershell", "-NoProfile", "-Command", ps], check=True,
+                   creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    assert salida.read_text(encoding="utf-8") == "contraseña€"

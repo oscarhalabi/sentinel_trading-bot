@@ -137,3 +137,45 @@ def test_registry_cli_list(tmp_path, capsys):
     (tmp_path / "example.env").write_text("BOTS=n1\n", encoding="utf-8")
     assert registry.main(["list", str(tmp_path)]) == 0
     assert capsys.readouterr().out.strip().splitlines() == [str(tmp_path / "a.env")]
+
+
+# --- terminal y cuenta MT5: nunca los de produccion ---
+
+MT5_OK = {"MT5_PATH": r"C:\MT5_instances_n1\mt5_123\terminal64.exe", "MT5_LOGIN": "123"}
+
+
+def test_mt5_propio_pasa():
+    registry.validate_mt5_target(MT5_OK)
+
+
+@pytest.mark.parametrize("cambio", [
+    {"MT5_PATH": ""},                                                     # sin ruta: terminal por defecto
+    {"MT5_PATH": r"C:\MT5_instances\mt5_26329953\terminal64.exe"},        # terminal de produccion
+    {"MT5_PATH": r"c:/mt5_instances/MT5_26329955/terminal64.exe"},        # idem, otra grafia
+    {"MT5_LOGIN": "26329957"},                                            # cuenta de produccion
+    {"MT5_LOGIN": ""},
+    {"MT5_LOGIN": "12a"},
+])
+def test_mt5_de_produccion_o_incompleto_aborta(cambio):
+    with pytest.raises(SystemExit):
+        registry.validate_mt5_target({**MT5_OK, **cambio})
+
+
+def test_carpeta_con_prefijo_parecido_no_es_produccion():
+    registry.validate_mt5_target({**MT5_OK, "MT5_PATH": r"C:\MT5_instances_n1\x\terminal64.exe"})
+
+
+def test_validate_env_completo(reg):
+    assert registry.validate_env(reg, {"BOTS": "n1,n2", **MT5_OK}) == ["n1", "n2"]
+    with pytest.raises(SystemExit):
+        registry.validate_env(reg, {"BOTS": "n1", "MAGIC_N1": "100300", **MT5_OK})   # magic del e2
+    with pytest.raises(SystemExit):
+        registry.validate_env(reg, {"BOTS": "n1", "MT5_LOGIN": "26329953",
+                                    "MT5_PATH": MT5_OK["MT5_PATH"]})
+
+
+def test_read_env_file_con_bom_y_no_ascii(tmp_path):
+    ruta = tmp_path / "a.env"
+    ruta.write_bytes("\ufeffBOTS=n1\nMT5_PASSWORD=contraseña€\n".encode("utf-8"))
+    env = registry.read_env_file(str(ruta))
+    assert env == {"BOTS": "n1", "MT5_PASSWORD": "contraseña€"}

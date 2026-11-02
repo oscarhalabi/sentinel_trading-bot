@@ -67,7 +67,7 @@ function Write-Fail($t) { Write-Host "  [FALLO] $t" -ForegroundColor Red }
 
 function Read-EnvFile($path) {
     $map = @{}
-    Get-Content $path | ForEach-Object {
+    Get-Content -LiteralPath $path -Encoding UTF8 | ForEach-Object {
         $line = $_.Trim()
         if ($line -eq "" -or $line.StartsWith("#") -or ($line -notmatch "=")) { return }
         $i = $line.IndexOf("=")

@@ -228,3 +228,51 @@ def test_alta_dry_run_no_consulta_supabase(tmp_path):
             raise AssertionError("dry-run no debe tocar Supabase")
     provision.alta(_args(dry_run=True), client=Explota(), instances_dir=str(tmp_path / "i"),
                    clones_dir=str(tmp_path / "c"))
+
+
+class FallaAlInsertar(FakeClient):
+    """Supabase cae en mitad del alta: el primer insert de bot_instances revienta."""
+
+    def __init__(self, fallos=1):
+        super().__init__()
+        self.fallos = fallos
+
+    def table(self, name):
+        t = super().table(name)
+        if name == "bot_instances" and self.fallos:
+            def insert(row):
+                self.fallos -= 1
+                raise RuntimeError("timeout de red")
+            t.insert = insert
+        return t
+
+
+def test_alta_si_supabase_falla_no_queda_env(tmp_path, monkeypatch):
+    """El vigilante lanza todo instances/*.env: sin filas no debe haber .env."""
+    _sin_clon(monkeypatch)
+    inst = tmp_path / "i"
+    cliente = FallaAlInsertar()
+    with pytest.raises(RuntimeError):
+        provision.alta(_args(), client=cliente, instances_dir=str(inst),
+                       clones_dir=str(tmp_path / "c"))
+    assert not inst.exists() or not list(inst.glob("*.env*"))
+    # Repetir el alta termina el trabajo y deja el .env definitivo (no un .env.new).
+    provision.alta(_args(), client=cliente, instances_dir=str(inst),
+                   clones_dir=str(tmp_path / "c"))
+    assert (inst / f"{VALORES['user_id']}.env").exists()
+    assert not (inst / f"{VALORES['user_id']}.env.new").exists()
+    assert not list(inst.glob("*.tmp"))
+
+
+@pytest.mark.parametrize("uid", [r"..\x", "../x", "abc", "", VALORES["user_id"] + r"\..\y"])
+def test_alta_user_id_no_uuid_aborta(tmp_path, uid):
+    with pytest.raises(SystemExit):
+        provision.alta(_args(user_id=uid, dry_run=True), client=FakeClient(),
+                       instances_dir=str(tmp_path / "i"), clones_dir=str(tmp_path / "c"))
+
+
+def test_alta_login_de_produccion_aborta(tmp_path):
+    with pytest.raises(SystemExit) as e:
+        provision.alta(_args(login="26329953", dry_run=True), client=FakeClient(),
+                       instances_dir=str(tmp_path / "i"), clones_dir=str(tmp_path / "c"))
+    assert "produccion" in str(e.value)

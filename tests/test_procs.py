@@ -73,7 +73,9 @@ def test_registry_cli_check(tmp_path):
     import pytest
     from motor import registry
     ok = tmp_path / "a.env"
-    ok.write_text("# c\nBOTS=n1,n2\nMAGIC_N1=300100\n", encoding="utf-8")
+    ok.write_text("# c\nBOTS=n1,n2\nMAGIC_N1=300100\n"
+                  "MT5_PATH=C:\\MT5_instances_n1\\mt5_1\\terminal64.exe\nMT5_LOGIN=1\n",
+                  encoding="utf-8")
     assert registry.main(["check", str(ok)]) == 0
     malo = tmp_path / "b.env"
     malo.write_text("BOTS=zzz\n", encoding="utf-8")
@@ -83,6 +85,11 @@ def test_registry_cli_check(tmp_path):
     vacio.write_text("USER_ID=x\n", encoding="utf-8")
     with pytest.raises(SystemExit):
         registry.main(["check", str(vacio)])
+    prod = tmp_path / "d.env"
+    prod.write_text("BOTS=n1\nMT5_PATH=C:\\MT5_instances\\mt5_26329953\\terminal64.exe\n"
+                    "MT5_LOGIN=1\n", encoding="utf-8")
+    with pytest.raises(SystemExit):
+        registry.main(["check", str(prod)])
 
 
 # --- endurecimiento ---

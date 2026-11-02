@@ -287,8 +287,11 @@ def run_tui(engine_cls=None):
     try:
         db, broker, engine, logger = botmain.setup(logger=logger, engine_cls=engine_cls)
     except Exception as e:  # noqa: BLE001
+        # Codigo distinto de 0: run_motor.ps1 cierra la ventana (aunque sea
+        # -NoExit) y el vigilante relanza el motor. Con return saldria con 0 y
+        # la ventana abierta haria creer al vigilante que el motor sigue vivo.
         console.print(f"[bold red]Error de arranque:[/] {e}")
-        return
+        raise SystemExit(1)
 
     stop_event = threading.Event()
     salida = {"codigo": None}

@@ -50,6 +50,19 @@ Guías: `docs/como-funciona.md` y `docs/convivencia-y-reemplazo.md`.
   margen multi-bot, ideas y pendientes de exp-2, workflow de push directo). Siguen en el historial de git.
 - **Reconexión MT5:** `motor/mt5_watch.py` detecta que el terminal no responde (3 latidos), reconecta con
   esperas crecientes y, a los 5 min (`MT5_GIVEUP_S`), el motor sale con código 3 para que el vigilante lo relance.
+- **Arreglos de la revisión de código del PR #1 (2026-11-02, pedidos por Daniel):**
+  1. El motor nunca se conecta a un terminal (`C:\MT5_instances`) ni a una cuenta (26329953/55/57)
+     de producción, y exige `MT5_PATH` y `MT5_LOGIN` (`registry.validate_mt5_target`).
+  2. Una sola validación de `.env` (`registry.validate_env`) para start_all, vigilante y motor.
+  3. La TUI sale con código 1 si falla al arrancar (antes 0: el vigilante no la relanzaba).
+  4. `provision alta`: primero Supabase y al final el `.env` (escritura atómica); `--user-id` solo UUID.
+  5. `run_motor.ps1` y `start_all.ps1` leen el `.env` como UTF-8; Python acepta BOM (`utf-8-sig`).
+  6. El vigilante reconoce motores lanzados a mano (`--env-file`/`--bot-id` en `motor.run`) y no
+     duplica un mismo `USER_ID` + motor de dos `.env`.
+  7. Reconexión MT5 con timeout de 30 s y latido `MT5_DOWN` antes de cada intento.
+  8. Si MT5 muere entre latidos, se deja de operar al momento con un solo aviso.
+  9. En modo sombra el cierre forzado se da por hecho (antes reintentaba para siempre).
+  10. Un solo lector de `.env` (`registry.read_env_file`) y un solo normalizador de rutas (`procs._norm`).
 
 ## Pendientes conocidos (para Oscar)
 

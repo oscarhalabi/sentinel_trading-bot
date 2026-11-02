@@ -16,13 +16,8 @@ def _load_dotenv():
     path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
     if not os.path.exists(path):
         return
-    with open(path, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            key, _, val = line.partition("=")
-            os.environ.setdefault(key.strip(), val.strip().strip('"').strip("'"))
+    for key, val in registry.read_env_file(path).items():
+        os.environ.setdefault(key, val)
 
 
 _load_dotenv()
@@ -66,8 +61,11 @@ CANDLES_PUBLISHER = (registry.parse_bots(_bots_env)[0]
 def validate_identity():
     """Aborta si la identidad de la instancia no cuadra con el registro.
 
-    Comprueba que USER_ID no este vacio, que BOT_ID exista en engines.json y
-    que MAGIC_NUMBER sea el magic que el registro asigna a ese bot.
+    Comprueba que USER_ID no este vacio, que BOT_ID exista en engines.json,
+    que MAGIC_NUMBER sea el magic que el registro asigna a ese bot, que los
+    magics de BOTS no se pisen ni choquen con produccion, y que MT5_PATH /
+    MT5_LOGIN no sean de produccion. Es la ultima barrera: corre en el propio
+    motor, lo lance quien lo lance (start_all, vigilante o a mano).
     Devuelve una lista de avisos (vacia si todo esta bien).
     """
     if not USER_ID:
@@ -87,6 +85,9 @@ def validate_identity():
             f"[ABORTADO] MAGIC_NUMBER={MAGIC_NUMBER} no coincide con el magic "
             f"{esperado} que el registro asigna al bot '{BOT_ID}'."
         )
+    bots = registry.parse_bots(os.environ.get("BOTS")) if os.environ.get("BOTS", "").strip() else [BOT_ID]
+    registry.validate_instance(reg, bots, os.environ)
+    registry.validate_mt5_target(os.environ)
     return []
 
 

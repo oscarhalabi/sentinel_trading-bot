@@ -15,6 +15,8 @@ import subprocess
 import sys
 from dataclasses import asdict, dataclass
 
+from motor.registry import PRODUCTION_MT5_DIR
+
 CLONES_POR_DEFECTO = r"C:\MT5_instances_n1"
 
 # Un proceso python es nuestro si su linea de comandos lleva alguna de estas marcas
@@ -25,8 +27,9 @@ MARCAS_PYTHON = (re.compile(r"-m\s+motor\.run(?![\w.])"),
                  re.compile(r"-m\s+scripts\.vigilante(?![\w.])"))
 MARCAS_POWERSHELL = (re.compile(r"run_motor\.ps1(?![\w.])"),)
 
-# Carpeta de los terminales de produccion: jamas es nuestra.
-CLONES_PRODUCCION = r"C:\MT5_instances"
+# Carpeta de los terminales de produccion: jamas es nuestra (una sola definicion,
+# en motor/registry.py).
+CLONES_PRODUCCION = PRODUCTION_MT5_DIR
 
 
 @dataclass

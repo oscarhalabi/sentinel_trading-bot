@@ -1,9 +1,13 @@
 """Entrada unica del bot: resuelve el motor de BOT_ID en engines.json y lo arranca.
 
 Uso:  python -m motor.run --mode {console,lite,tui} [--root <ruta del repo>]
+                          [--env-file <ruta del .env> --bot-id <motor>]
 
 --root es solo una marca en la linea de comandos para que los scripts puedan
 reconocer los procesos de este repo; si se pasa, debe ser la raiz del repo.
+--env-file y --bot-id son otra marca (la pone run_motor.ps1): con ella el
+vigilante sabe que motor de que .env esta vivo aunque se lanzara a mano.
+--bot-id, si se pasa, debe coincidir con BOT_ID.
 
 Una sola instancia por (USER_ID, BOT_ID): antes de arrancar se toma un candado
 (mutex con nombre de Windows; si falla, un archivo bloqueado en logs/). Si ya
@@ -133,11 +137,20 @@ def main(argv=None):
     parser.add_argument("--mode", choices=("console", "lite", "tui"), default="console")
     parser.add_argument("--root", default=None,
                         help="ruta absoluta de la raiz del repo (marca para identificar el proceso)")
+    parser.add_argument("--env-file", default=None,
+                        help="ruta absoluta del .env de la instancia (marca para el vigilante)")
+    parser.add_argument("--bot-id", default=None,
+                        help="motor de esta instancia (marca para el vigilante; = BOT_ID)")
     args = parser.parse_args(argv)
 
     if args.root is not None and _norm(args.root) != _norm(_raiz_repo()):
         raise SystemExit(
             f"[ABORTADO] --root '{args.root}' no es la raiz de este repo ({_raiz_repo()})."
+        )
+
+    if args.bot_id is not None and args.bot_id.strip().lower() != config.BOT_ID:
+        raise SystemExit(
+            f"[ABORTADO] --bot-id '{args.bot_id}' no coincide con BOT_ID '{config.BOT_ID}'."
         )
 
     reg = registry.load_registry()

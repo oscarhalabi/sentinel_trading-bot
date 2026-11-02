@@ -5,10 +5,15 @@ Da de alta UNA cuenta a mano desde la linea de comandos:
   1. Clona la instalacion BASE de MetaTrader 5 a una carpeta propia
      (MT5_CLONES_DIR, por defecto C:\\MT5_instances_n1; modo portable).
   2. Siembra el perfil IPC y habilita Algo Trading en el clon.
-  3. Escribe instances\\<user_id>.env (con la contrasena MT5; nunca se imprime).
-  4. En Supabase crea SOLO lo que falte (nunca pisa filas existentes):
+  3. En Supabase crea SOLO lo que falte (nunca pisa filas existentes):
      bot_instances (is_active=false) y engine_config (params={}) por cada
      motor, y account_settings.
+  4. Escribe instances\\<user_id>.env (con la contrasena MT5; nunca se imprime).
+
+El .env va AL FINAL y se escribe de golpe (archivo temporal + renombrado): el
+vigilante lanza cualquier instances\\*.env que vea, asi que solo debe aparecer
+cuando las filas de Supabase ya existen. Si algo falla antes, repetir el alta
+termina el trabajo (lo que ya existe no se toca).
 
 Este script NO lanza motores ni reinicia nada: las instancias nuevas las
 arranca el vigilante (scripts/vigilante.py). Tampoco toca la tarea programada
@@ -38,7 +43,7 @@ import re
 import shutil
 
 from motor.registry import (assert_usuario_propio, instance_env_files, load_registry, magic_for,
-                            parse_bots, validate_instance)
+                            parse_bots, read_env_file, validate_instance, validate_mt5_target)
 from scripts.procs import CLONES_PRODUCCION, _es_o_contiene
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -88,18 +93,25 @@ def clone_dir_for(login: str, clones_dir: str) -> str:
 
 
 def _read_env_file(path):
-    values = {}
+    """El lector unico de .env (motor.registry), sin fallar si el archivo no existe."""
     try:
-        with open(path, encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith("#") or "=" not in line:
-                    continue
-                key, _, val = line.partition("=")
-                values[key.strip()] = val.strip().strip('"').strip("'")
+        return read_env_file(path)
     except OSError:
-        pass
-    return values
+        return {}
+
+
+_UUID = re.compile(r"[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}")
+
+
+def _escribir_env(env_path, contenido):
+    """Escribe el .env de golpe: temporal (no acaba en .env) + renombrado.
+
+    El vigilante nunca ve un .env a medio escribir.
+    """
+    tmp = env_path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(contenido)
+    os.replace(tmp, env_path)
 
 
 def _find_supabase_creds():
@@ -284,11 +296,18 @@ def alta(args, *, client=None, instances_dir=INSTANCES_DIR, clones_dir=None):
             f"produccion {CLONES_PRODUCCION}, la contiene o esta dentro de ella.")
     if not re.fullmatch(r"[0-9]+", str(args.login)):
         raise SystemExit(f"[ABORTADO] --login debe ser numerico (recibido: {args.login!r}).")
+    # El user_id se usa como nombre de archivo: solo se acepta un UUID (nada de rutas).
+    if not _UUID.fullmatch(str(args.user_id)):
+        raise SystemExit(f"[ABORTADO] --user-id debe ser el UUID del usuario de Supabase "
+                         f"(recibido: {args.user_id!r}).")
     registro = load_registry()
     bots = parse_bots(args.bots)
     validate_instance(registro, bots, os.environ)
     magics = {b: magic_for(registro[b], os.environ) for b in bots}
     clone = clone_dir_for(args.login, clones_dir)
+    # Ni cuenta ni terminal de produccion (la misma regla que aplica el motor al arrancar).
+    validate_mt5_target({"MT5_PATH": os.path.join(clone, "terminal64.exe"),
+                         "MT5_LOGIN": str(args.login)})
     label = args.label or f"Cuenta {args.login}"
     env_path = os.path.join(instances_dir, f"{args.user_id}.env")
 
@@ -299,6 +318,7 @@ def alta(args, *, client=None, instances_dir=INSTANCES_DIR, clones_dir=None):
         print(f"  motores  : {', '.join(bots)}  magics: {magics}")
         print(f"  Supabase : crea si falta bot_instances/engine_config x{len(bots)}, "
               f"account_settings (usuario {args.user_id})")
+        print("  orden    : clon MT5, filas de Supabase y por ultimo el .env")
         print(f"  cuenta   : login={args.login} server={args.server} password=******")
         return
 
@@ -316,6 +336,10 @@ def alta(args, *, client=None, instances_dir=INSTANCES_DIR, clones_dir=None):
     _assert_engine_config_existe(client)
 
     mt5_path = _clone_mt5(args.login, clones_dir)
+    # Primero Supabase: si falla, no queda ningun .env que el vigilante lance
+    # sin sus filas. Repetir el alta crea solo lo que falte.
+    _upsert_supabase(client, args.user_id, bots, args.login, label)
+    print("    filas de Supabase listas (bot_instances inactivas).")
     contenido = render_env({
         "label": label, "email": args.email,
         "stamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -327,13 +351,12 @@ def alta(args, *, client=None, instances_dir=INSTANCES_DIR, clones_dir=None):
     if os.path.exists(env_path):
         # No pisar un .env existente (podria tener ajustes manuales).
         env_path += ".new"
+        print("    [AVISO] ya existia el .env de este usuario: el nuevo queda como .env.new "
+              "(comparalo y renombralo a mano si hace falta).")
     os.makedirs(instances_dir, exist_ok=True)
-    with open(env_path, "w", encoding="utf-8") as f:
-        f.write(contenido)
+    _escribir_env(env_path, contenido)
     print(f"    .env escrito: {env_path}")
-    _upsert_supabase(client, args.user_id, bots, args.login, label)
-    print("    filas de Supabase listas (bot_instances inactivas). "
-          "El vigilante lanzara la instancia.")
+    print("    El vigilante lanzara la instancia.")
 
 
 def main(argv=None):

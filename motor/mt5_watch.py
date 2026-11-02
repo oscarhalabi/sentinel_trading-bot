@@ -5,23 +5,38 @@ sigue vivo pero todas las llamadas a MT5 fallan. Este vigilante lo detecta
 (una vez por heartbeat), intenta reconectar con espera creciente y, si pasan
 demasiados minutos (aprox.: se evalua en cada latido), se rinde para que el bucle salga y el vigilante de
 procesos relance el motor.
+
+Cada intento de reconexion llama a mt5.initialize(), que bloquea el bucle
+mientras espera. Por eso el intento usa un timeout corto (RECONEXION_TIMEOUT_MS,
+no los 120 s del primer arranque) y, justo antes, avisa con on_attempt (el
+bucle lo usa para mandar un latido MT5_DOWN y que el dashboard no vea la
+instancia como apagada mientras espera).
 """
 import time
+
+# Tope del timeout de mt5.initialize() al reconectar (ms). El primer arranque de
+# un clon puede necesitar mas (MT5_TIMEOUT_MS); una reconexion no.
+RECONEXION_TIMEOUT_MS = 30000
 
 
 class Mt5Watch:
     def __init__(self, init_kwargs, logger, *, fail_threshold=3, giveup_s=300.0,
-                 backoff_s=(5, 15, 30, 60), clock=time.monotonic, mt5_module=None, on_reconnect=None):
+                 backoff_s=(5, 15, 30, 60), clock=time.monotonic, mt5_module=None, on_reconnect=None,
+                 on_attempt=None, reconnect_timeout_ms=RECONEXION_TIMEOUT_MS):
         if mt5_module is None:
             import MetaTrader5 as mt5_module
         self._mt5 = mt5_module
-        self._kw = init_kwargs
+        # Mismos argumentos que el arranque, con el timeout recortado.
+        self._kw = {**init_kwargs,
+                    "timeout": min(int(init_kwargs.get("timeout", reconnect_timeout_ms)),
+                                   reconnect_timeout_ms)}
         self._log = logger
         self._threshold = fail_threshold
         self._giveup_s = giveup_s
         self._backoff = tuple(backoff_s)
         self._clock = clock
         self._on_reconnect = on_reconnect  # se llama tras reconectar (p. ej. symbol_select)
+        self._on_attempt = on_attempt      # se llama justo antes de cada intento (latido MT5_DOWN)
         self._reset()
 
     def _reset(self):
@@ -88,6 +103,11 @@ class Mt5Watch:
         self._intentos += 1
         self._proximo_intento = ahora + espera
         self._log.write("SYSTEM", f"MT5 sin respuesta: reconectando (intento {self._intentos}).")
+        if self._on_attempt is not None:
+            try:
+                self._on_attempt()
+            except Exception:  # noqa: BLE001
+                pass
         if self._reconectar():
             if self._on_reconnect is not None:
                 try:

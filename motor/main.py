@@ -396,9 +396,12 @@ def trading_loop(db, engine, logger, stop_event=None):
     known_open_tickets = set()  # ultimo set de tickets OPEN reportado a bot_positions
     watch = Mt5Watch(config.mt5_init_kwargs(), logger,
                      fail_threshold=config.MT5_FAIL_THRESHOLD, giveup_s=config.MT5_GIVEUP_S,
-                     on_reconnect=lambda: _reseleccionar_simbolos(engine))
+                     on_reconnect=lambda: _reseleccionar_simbolos(engine),
+                     # Latido MT5_DOWN antes de cada intento: el intento bloquea el bucle.
+                     on_attempt=lambda: db.report("MT5_DOWN"))
     mt5_estado = "OK"  # ultimo veredicto del vigilante (se actualiza en cada heartbeat)
     aviso_force_close = False  # ya se aviso (en este episodio) que el cierre forzado espera
+    aviso_mt5_caido = False    # ya se aviso (en este episodio) que MT5 dejo de responder
 
     def running():
         return stop_event is None or not stop_event.is_set()
@@ -467,7 +470,19 @@ def trading_loop(db, engine, logger, stop_event=None):
             # reporte siguen: la instancia debe verse viva en el dashboard.
             # Con MT5 caido o reconectando tampoco se opera (el heartbeat sigue).
             if cfg and mt5_estado == "OK":
-                engine.on_tick()
+                try:
+                    engine.on_tick()
+                    aviso_mt5_caido = False
+                except MT5NoDisponible as e:
+                    # MT5 murio entre dos latidos: se deja de operar YA (sin
+                    # esperar al proximo latido) y se avisa una sola vez, no un
+                    # ERROR por vuelta. El latido de abajo sale igual (MT5_DOWN) y
+                    # el vigilante de MT5 confirma y reconecta en el siguiente.
+                    mt5_estado = "RECONNECTING"
+                    if not aviso_mt5_caido:
+                        logger.write("SYSTEM", f"MT5 dejo de responder ({e}): se pausa la "
+                                               "operativa hasta el siguiente latido.")
+                        aviso_mt5_caido = True
 
             # Heartbeat + estado observacional.
             if now - last_report >= config.HEARTBEAT_INTERVAL:

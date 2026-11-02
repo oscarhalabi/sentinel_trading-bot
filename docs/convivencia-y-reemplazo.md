@@ -45,6 +45,11 @@ Cómo se garantiza que nuestros scripts no tocan producción:
   escribir nada y el motor no arranca.
 - Un solo motor por usuario y `bot_id`: `motor.run` toma un candado (mutex de Windows) al
   arrancar; si ya lo tiene otro proceso, sale sin operar (código 0).
+- **Terminal y cuenta MT5:** el `.env` debe traer `MT5_PATH` (fuera de `C:\MT5_instances`) y un
+  `MT5_LOGIN` que no sea 26329953/55/57. Sin `MT5_PATH`, `mt5.initialize()` se engancharía al
+  terminal por defecto, que puede ser uno de producción. Lo comprueban `motor.registry
+  validate_env` (start_all y vigilante), `provision alta` y el propio motor al arrancar
+  (`config.validate_identity`), lo lance quien lo lance.
 - `scripts\instalar_tareas.ps1` solo toca la tarea `SentinelN1Vigilante`.
 - Antes de reiniciar, `restart_motor.ps1 -DryRun` muestra qué mataría. En la verificación de la
   Fase 1 debe listar **cero** procesos de producción.
@@ -64,10 +69,16 @@ modifica, así que el bot nuevo se defiende solo:
   fallidos intenta reconectar (esperas de 5, 15, 30 y 60 s) y mientras tanto no opera. Si en
   unos 5 minutos (`MT5_GIVEUP_S`, aprox.: se evalúa en cada latido) no lo logra, sale con código 3 y es el vigilante quien lo
   vuelve a levantar.
-- Cómo ve el vigilante si un motor está vivo: por el PowerShell de `run_motor.ps1`. Un motor que
+- Cómo ve el vigilante si un motor está vivo: por el PowerShell de `run_motor.ps1` o por el
+  python de `motor.run`, que `run_motor.ps1` lanza con `--env-file <ruta absoluta> --bot-id <motor>`
+  (así también reconoce un motor arrancado a mano desde una consola abierta). Un motor que
   se cae con error se relanza (`run_motor.ps1` cierra su PowerShell aunque se abriera con
-  `-NoExit`). Un motor detenido limpiamente en una ventana `-NoExit` no se relanza hasta cerrar
-  esa ventana.
+  `-NoExit`; un fallo al arrancar sale con código 1 en los tres modos). Un motor detenido
+  limpiamente en una ventana `-NoExit` no se relanza hasta cerrar esa ventana.
+- El vigilante no lanza un `.env` que no pase la validación (lo registra como `[ERROR]`), ni
+  un mismo `USER_ID` + motor que ya lance otro `.env`.
+- Mientras reconecta, cada intento de `mt5.initialize()` espera como máximo 30 s y antes manda
+  un latido `MT5_DOWN`, para que el dashboard no vea la instancia apagada.
 
 Consecuencia práctica: si un motor "desaparece" por unos minutos justo después de un alta en
 producción, es normal. Si pasa seguido, avisar a Daniel.

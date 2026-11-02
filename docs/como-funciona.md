@@ -97,7 +97,7 @@ MT5, y `BOTS=n1,n2` (los motores que corren sobre esa cuenta). Plantilla:
 | `python -m scripts.provision alta ...` | Da de alta una cuenta a mano: clona MT5, escribe el `.env`, siembra filas en Supabase |
 | `python -m scripts.procs list --json` | Lista los procesos que son de este repo (lo usa `restart_motor.ps1`) |
 | `python -m scripts.localdb_migrate` | Crea/actualiza las tablas del Postgres local |
-| `python -m motor.registry check <env>` | Valida un `.env` (motores conocidos, magics distintos) |
+| `python -m motor.registry check <env>` | Valida un `.env` (motores conocidos, magics distintos, terminal y cuenta MT5 que no sean de producción) |
 | `scripts\news_exporter.py` | Exportador de noticias. **Lo corre producción; este repo no lo lanza** |
 
 ## Postgres local: preparación (una vez)

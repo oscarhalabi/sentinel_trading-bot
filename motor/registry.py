@@ -8,6 +8,7 @@ import glob
 import importlib
 import json
 import os
+import re
 from dataclasses import dataclass
 from typing import Mapping
 
@@ -17,6 +18,12 @@ DEFAULT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "engines
 # no los trae, valen los mismos por defecto que usa produccion (bot/config.py).
 PRODUCTION_MAGIC_DEFAULTS = {"MAGIC_M15": 100100, "MAGIC_M5": 100200, "MAGIC_E2": 100300}
 PRODUCTION_MAGIC_ENVS = tuple(PRODUCTION_MAGIC_DEFAULTS)
+
+# Terminales y cuentas MT5 de produccion: el bot nuevo jamas se conecta a ellos.
+# mt5.initialize() con la ruta de un terminal de produccion se engancharia a el
+# (y con otro login le cambiaria la cuenta al e2 en vivo).
+PRODUCTION_MT5_DIR = r"C:\MT5_instances"
+PRODUCTION_MT5_LOGINS = frozenset({26329953, 26329955, 26329957})
 
 # Archivos de instances\ que NO son instancias (plantillas y borradores).
 # Regla unica: la usan el vigilante, start_all.ps1 (via "list") y el provisionador.
@@ -92,6 +99,45 @@ def validate_instance(registry: dict[str, EngineSpec], bots: list[str],
             )
 
 
+def _bajo_carpeta(ruta: str, carpeta: str) -> bool:
+    """True si 'ruta' esta dentro de 'carpeta' (C:/MT5_instances_n1 no cuenta como C:/MT5_instances)."""
+    r = os.path.normcase(os.path.abspath(ruta))
+    c = os.path.normcase(os.path.abspath(carpeta))
+    return r.startswith(c.rstrip("\\/") + os.sep)
+
+
+def validate_mt5_target(env: Mapping[str, str]) -> None:
+    """Aborta si el .env apunta a un terminal o a una cuenta de produccion.
+
+    Exige MT5_PATH (sin ruta, mt5.initialize() se engancha al terminal por
+    defecto o al primero abierto, que puede ser de produccion) y un MT5_LOGIN
+    numerico que no sea de produccion.
+    """
+    ruta = (env.get("MT5_PATH") or "").strip()
+    if not ruta:
+        raise SystemExit("[ABORTADO] Falta MT5_PATH: sin ruta MT5 se engancharia al terminal "
+                         "por defecto, que puede ser uno de produccion.")
+    if _bajo_carpeta(ruta, PRODUCTION_MT5_DIR):
+        raise SystemExit(f"[ABORTADO] MT5_PATH '{ruta}' es un terminal de produccion "
+                         f"({PRODUCTION_MT5_DIR}).")
+    login = (env.get("MT5_LOGIN") or "").strip()
+    if not re.fullmatch(r"[0-9]+", login):
+        raise SystemExit(f"[ABORTADO] MT5_LOGIN debe ser un numero (recibido: {login!r}).")
+    if int(login) in PRODUCTION_MT5_LOGINS:
+        raise SystemExit(f"[ABORTADO] MT5_LOGIN {login} es una cuenta de produccion.")
+
+
+def validate_env(registry: dict[str, EngineSpec], env: Mapping[str, str]) -> list[str]:
+    """Validacion completa del .env de una instancia. Devuelve sus motores (BOTS).
+
+    La usan start_all.ps1 (via "check"), el vigilante y el propio motor al arrancar.
+    """
+    bots = parse_bots(env.get("BOTS"))
+    validate_instance(registry, bots, env)
+    validate_mt5_target(env)
+    return bots
+
+
 def assert_usuario_propio(client, user_id: str, registry: dict[str, EngineSpec]) -> None:
     """Aborta si el usuario ya tiene instancias de motores que no son de este bot.
 
@@ -133,9 +179,13 @@ def load_engine_class(spec: EngineSpec) -> type:
 
 
 def read_env_file(path: str) -> dict[str, str]:
-    """Lee un .env (KEY=VALUE por linea) igual que lo hace run_motor.ps1."""
+    """Lee un .env (KEY=VALUE por linea) igual que lo hace run_motor.ps1.
+
+    UNICO lector de .env en Python (motor, vigilante, provisionador). utf-8-sig:
+    acepta el archivo con o sin BOM (el Bloc de notas puede anadirlo).
+    """
     env: dict[str, str] = {}
-    with open(path, encoding="utf-8") as f:
+    with open(path, encoding="utf-8-sig") as f:
         for linea in f:
             linea = linea.strip()
             if not linea or linea.startswith("#") or "=" not in linea:
@@ -149,7 +199,7 @@ def main(argv: list[str] | None = None) -> int:
     """Mini-CLI para los scripts .ps1.
 
     magic <bot_id>    imprime el magic del motor (lee os.environ).
-    check <envfile>   valida BOTS y los magics del .env (sale con error si algo no cuadra).
+    check <envfile>   valida BOTS, magics y terminal/cuenta MT5 del .env (sale con error si algo no cuadra).
     list <carpeta>    imprime los .env de instancia de la carpeta (uno por linea).
     """
     import sys
@@ -173,9 +223,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if not os.path.isfile(valor):
         raise SystemExit(f"[ABORTADO] No existe el archivo de entorno: {valor}")
-    env = read_env_file(valor)
-    bots = parse_bots(env.get("BOTS"))
-    validate_instance(reg, bots, env)
+    bots = validate_env(reg, read_env_file(valor))
     print(f"[OK] {os.path.basename(valor)}: motores {', '.join(bots)}")
     return 0
 

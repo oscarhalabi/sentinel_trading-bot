@@ -18,7 +18,9 @@
 
     Siempre se pasa --root con la ruta absoluta del repo: asi la linea de comandos
     del proceso lleva la ruta y restart_motor.ps1 puede reconocerlo como propio
-    (y nunca confundirlo con los procesos de produccion).
+    (y nunca confundirlo con los procesos de produccion). Tambien --env-file
+    (ruta absoluta) y --bot-id: con eso el vigilante reconoce el motor aunque se
+    haya lanzado a mano desde una consola ya abierta.
 
     Para levantar todos los motores de todos los usuarios con preflight y tests,
     usa scripts\start_all.ps1.
@@ -53,9 +55,13 @@ if (-not (Test-Path $EnvFile)) {
     Write-Error "No existe el archivo de entorno: $EnvFile"
     exit 1
 }
+# Ruta absoluta (antes de cambiar de carpeta): va como marca a motor.run.
+$EnvFile = (Resolve-Path -LiteralPath $EnvFile).Path
 
-# Cargar KEY=VALUE (ignora comentarios y lineas vacias).
-Get-Content $EnvFile | ForEach-Object {
+# Cargar KEY=VALUE (ignora comentarios y lineas vacias). -Encoding UTF8: el .env
+# se escribe en UTF-8 sin BOM y PowerShell 5.1 lo leeria como ANSI (una "ñ" de
+# la contrasena llegaria rota a MT5).
+Get-Content -LiteralPath $EnvFile -Encoding UTF8 | ForEach-Object {
     $line = $_.Trim()
     if ($line -eq "" -or $line.StartsWith("#") -or ($line -notmatch "=")) { return }
     $idx = $line.IndexOf("=")
@@ -86,7 +92,7 @@ $env:MAGIC_NUMBER = ("$magic" -split "\s+" | Where-Object { $_ } | Select-Object
 
 Write-Host "Arrancando $BotId | USER_ID=$env:USER_ID SYMBOL=$env:SYMBOL BOT_ID=$env:BOT_ID MAGIC=$env:MAGIC_NUMBER (modo: $Mode)" -ForegroundColor Cyan
 
-python -m motor.run --mode $Mode --root "$projectRoot"
+python -m motor.run --mode $Mode --root "$projectRoot" --env-file "$EnvFile" --bot-id $BotId
 $codigo = $LASTEXITCODE
 
 # Si el motor se cae con error, se cierra tambien esta ventana de PowerShell,

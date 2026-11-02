@@ -7,8 +7,14 @@ REPO = r"C:\Users\Administrator\Documents\sentinel_trading-bot"
 RUNNER = REPO + r"\scripts\run_motor.ps1"
 
 
+# Terminal y cuenta propios (validate_env los exige); se anaden si el .env no los trae.
+MT5_PROPIO = "MT5_PATH=C:\\MT5_instances_n1\\mt5_1\\terminal64.exe\nMT5_LOGIN=1\n"
+
+
 def _env(carpeta, nombre, contenido):
     ruta = carpeta / nombre
+    if "MT5_" not in contenido:
+        contenido += MT5_PROPIO
     ruta.write_text(contenido, encoding="utf-8")
     return str(ruta)
 
@@ -120,3 +126,38 @@ def test_tarea_programada_pasa_root():
     with open(ruta, encoding="utf-8") as f:
         texto = f.read()
     assert '-m scripts.vigilante --root' in texto
+
+
+def test_env_que_no_pasa_la_validacion_no_se_lanza(tmp_path):
+    ok = _env(tmp_path, "ok.env", "BOTS=n1\n")
+    _env(tmp_path, "prod.env", "BOTS=n1\nMT5_PATH=C:\\MT5_instances\\mt5_26329953\\terminal64.exe\n"
+                               "MT5_LOGIN=1\n")
+    _env(tmp_path, "cuenta.env", "BOTS=n1\nMT5_PATH=C:\\MT5_instances_n1\\x\\terminal64.exe\n"
+                                 "MT5_LOGIN=26329955\n")
+    _env(tmp_path, "magic.env", "BOTS=n1,n2\nMAGIC_N2=300100\n")
+    _env(tmp_path, "e2.env", "BOTS=n1\nMAGIC_N1=100300\n")
+    log = tmp_path / "v.log"
+    assert expected_instances(str(tmp_path), str(log)) == {(ok, "n1")}
+    assert log.read_text(encoding="utf-8").count("[ERROR]") == 4
+
+
+def test_mismo_usuario_y_motor_en_dos_env_solo_lanza_el_primero(tmp_path):
+    a = _env(tmp_path, "a.env", "USER_ID=U1\nBOTS=n1,n2\n")
+    _env(tmp_path, "b.env", "USER_ID=u1\nBOTS=n1\n")
+    c = _env(tmp_path, "c.env", "USER_ID=u2\nBOTS=n1\n")
+    assert expected_instances(str(tmp_path)) == {(a, "n1"), (a, "n2"), (c, "n1")}
+
+
+def _proc_python(pid, env_path, bot):
+    cmd = (f'python -m motor.run --mode console --root "{REPO}" '
+           f'--env-file "{env_path}" --bot-id {bot}')
+    return Proc(pid, "python.exe", cmd, "")
+
+
+def test_motor_lanzado_a_mano_cuenta_como_vivo(tmp_path):
+    """Lanzado desde una consola abierta: no hay PowerShell con -EnvFile, solo el python."""
+    env_a = _env(tmp_path, "a.env", "BOTS=n1,n2\n")
+    corriendo = running_instances([_proc_python(7, env_a, "n1")])
+    assert missing({(env_a, "n1"), (env_a, "n2")}, corriendo) == {(env_a, "n2")}
+    # --bot-id n10 no cuenta como n1
+    assert missing({(env_a, "n1")}, running_instances([_proc_python(8, env_a, "n10")])) == {(env_a, "n1")}

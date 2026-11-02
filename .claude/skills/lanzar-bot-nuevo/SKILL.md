@@ -70,6 +70,8 @@ python -m scripts.vigilante --dry-run   # qué relanzaría ahora
 
 Relanza los motores de `BOTS=` que no estén vivos. Tope: 5 relanzamientos en 30 min por
 motor (estado en `logs\vigilante_estado.json`, log en `logs\vigilante.log`).
+Un `.env` que no pasa `python -m motor.registry check <env>` no se lanza (sale `[ERROR]` en el
+log). Un motor arrancado a mano con `run_motor.ps1` cuenta como vivo.
 Solo toca la tarea `SentinelN1Vigilante`, jamás las `Sentinel*` de producción.
 
 ## 5. Verificar al terminar
@@ -82,5 +84,7 @@ Solo toca la tarea `SentinelN1Vigilante`, jamás las `Sentinel*` de producción.
 ## Si algo falla
 
 - "Los bots X e Y comparten el magic": revisar `MAGIC_N1`/`MAGIC_N2` en el `.env`.
+- "Falta MT5_PATH", "es un terminal de produccion" o "es una cuenta de produccion": el `.env`
+  apunta a producción o le falta el terminal; corregirlo (el clon propio está en `C:\MT5_instances_n1`).
 - El vigilante dice "desactivado por 5 reintentos": mirar el log del motor, arreglar, y esperar 30 min o borrar `logs\vigilante_estado.json`.
 - Un reinicio de producción mató nuestros terminales: es normal, el vigilante los relanza en 3 min como máximo.

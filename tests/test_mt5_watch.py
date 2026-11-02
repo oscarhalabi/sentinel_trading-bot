@@ -64,7 +64,7 @@ def test_reconecta_tras_umbral():
     assert mt5.init_calls == []          # 2 fallos: todavia no
     assert w.check() == "RECONNECTING"   # 3er fallo: intenta
     assert mt5.shutdown_calls == 1
-    assert mt5.init_calls == [{"path": "x"}]
+    assert mt5.init_calls == [{"path": "x", "timeout": 30000}]
     mt5.init_ok = True
     # Tras el backoff, el intento exitoso devuelve OK y loguea una sola vez.
     w._clock.t += 5
@@ -139,3 +139,26 @@ def test_on_reconnect_se_llama_al_reconectar():
     assert llamadas == [1]
     assert w.check() == "OK"
     assert llamadas == [1]
+
+
+def test_reconexion_usa_timeout_corto():
+    """mt5.initialize bloquea el bucle: al reconectar nunca se esperan los 120 s del arranque."""
+    mt5, reloj, logger = FakeMt5(), Reloj(), MagicMock()
+    w = Mt5Watch({"path": "x", "timeout": 120000, "portable": True}, logger,
+                 clock=reloj, mt5_module=mt5, fail_threshold=1)
+    mt5.vivo = False
+    mt5.init_ok = False
+    w.check()
+    assert mt5.init_calls == [{"path": "x", "timeout": 30000, "portable": True}]
+
+
+def test_on_attempt_antes_de_cada_intento():
+    """El bucle manda un latido MT5_DOWN antes del intento (que bloquea)."""
+    orden = []
+    mt5, reloj, logger = FakeMt5(), Reloj(), MagicMock()
+    mt5.initialize = lambda **kw: orden.append("init") or False
+    w = Mt5Watch({"path": "x"}, logger, clock=reloj, mt5_module=mt5, fail_threshold=1,
+                 on_attempt=lambda: orden.append("latido"))
+    mt5.vivo = False
+    w.check()
+    assert orden == ["latido", "init"]

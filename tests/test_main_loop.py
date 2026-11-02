@@ -145,6 +145,14 @@ def test_run_root_valido_e_invalido(monkeypatch):
         motor_run.main(["--root", os.path.join(raiz, "otro")])
 
 
+def test_run_bot_id_debe_coincidir_con_bot_id(monkeypatch):
+    monkeypatch.setattr(config, "BOT_ID", "n1")
+    monkeypatch.setattr(botmain, "run", lambda engine_cls=None: None)
+    motor_run.main(["--env-file", r"C:\x\a.env", "--bot-id", "N1"])
+    with pytest.raises(SystemExit):
+        motor_run.main(["--env-file", r"C:\x\a.env", "--bot-id", "n2"])
+
+
 def test_nulo_close_all_devuelve_true_cuando_plano():
     broker = MagicMock()
     pos = SimpleNamespace(ticket=1)
@@ -158,6 +166,30 @@ def test_nulo_close_all_false_si_quedan():
     broker = MagicMock()
     broker.positions.return_value = [SimpleNamespace(ticket=1)]
     assert NullEngine(broker, MagicMock()).close_all("x") is False
+
+
+def test_nulo_close_all_en_sombra_se_da_por_hecho():
+    """En sombra no se envian ordenes: el cierre forzado se consume igual."""
+    broker = MagicMock()
+    broker.shadow = True
+    broker.positions.return_value = [SimpleNamespace(ticket=1)]
+    assert NullEngine(broker, MagicMock()).close_all("x") is True
+    broker.close_position.assert_called_once()
+
+
+def test_tui_error_de_arranque_sale_con_codigo_1(monkeypatch):
+    """Con codigo 0, run_motor.ps1 dejaria la ventana -NoExit abierta y el vigilante no relanzaria."""
+    from motor import tui
+
+    def falla(**kw):
+        raise RuntimeError("No se pudo inicializar MetaTrader 5")
+
+    monkeypatch.setattr(tui.botmain, "setup", falla)
+    monkeypatch.setattr(tui.botmain, "disable_quickedit", lambda: None)
+    monkeypatch.setattr(tui, "Logger", MagicMock())
+    with pytest.raises(SystemExit) as e:
+        tui.run_tui(engine_cls=NullEngine)
+    assert e.value.code == 1
 
 
 def test_render_params_generico():
@@ -316,3 +348,59 @@ def test_setup_sigue_con_usuario_propio(monkeypatch):
     with pytest.raises(RuntimeError, match="paso el guard"):
         botmain.setup(logger=logger, engine_cls=NullEngine)
     assert not db.close.called
+
+
+def test_validate_identity_rechaza_terminal_y_cuenta_de_produccion(monkeypatch):
+    """Ultima barrera dentro del motor, lo lance quien lo lance."""
+    monkeypatch.setattr(config, "USER_ID", "u")
+    monkeypatch.setattr(config, "BOT_ID", "n1")
+    monkeypatch.setattr(config, "MAGIC_NUMBER", 300100)
+    monkeypatch.delenv("MAGIC_N1", raising=False)
+    monkeypatch.setenv("BOTS", "n1")
+    monkeypatch.setenv("MT5_PATH", r"C:\MT5_instances_n1\mt5_1\terminal64.exe")
+    monkeypatch.setenv("MT5_LOGIN", "1")
+    assert config.validate_identity() == []
+    monkeypatch.setenv("MT5_PATH", r"C:\MT5_instances\mt5_26329953\terminal64.exe")
+    with pytest.raises(SystemExit):
+        config.validate_identity()
+    monkeypatch.setenv("MT5_PATH", r"C:\MT5_instances_n1\mt5_1\terminal64.exe")
+    monkeypatch.setenv("MT5_LOGIN", "26329953")
+    with pytest.raises(SystemExit):
+        config.validate_identity()
+
+
+def test_validate_identity_rechaza_magics_repetidos_en_bots(monkeypatch):
+    monkeypatch.setattr(config, "USER_ID", "u")
+    monkeypatch.setattr(config, "BOT_ID", "n1")
+    monkeypatch.setattr(config, "MAGIC_NUMBER", 300100)
+    monkeypatch.delenv("MAGIC_N1", raising=False)
+    monkeypatch.setenv("BOTS", "n1,n2")
+    monkeypatch.setenv("MAGIC_N2", "300100")
+    monkeypatch.setenv("MT5_PATH", r"C:\MT5_instances_n1\mt5_1\terminal64.exe")
+    monkeypatch.setenv("MT5_LOGIN", "1")
+    with pytest.raises(SystemExit):
+        config.validate_identity()
+
+
+def test_mt5_cae_entre_latidos_un_solo_aviso_y_sin_operar(monkeypatch):
+    """positions_get devuelve None en on_tick: se deja de operar sin un ERROR por vuelta."""
+    from motor.broker import MT5NoDisponible
+    _entorno(monkeypatch)
+    monkeypatch.setattr(config, "HEARTBEAT_INTERVAL", 3600)  # sin latidos durante la prueba
+    db, engine = _doble_db({"params": {}}), _doble_engine()
+    engine.on_tick.side_effect = MT5NoDisponible("positions_get fallo")
+    logger = MagicMock()
+    botmain.trading_loop(db, engine, logger, StopDespues(6))
+    assert engine.on_tick.call_count == 1          # tras el fallo ya no se opera
+    tipos = [c.args[0] for c in logger.write.call_args_list]
+    assert "ERROR" not in tipos
+    assert sum("MT5 dejo de responder" in c.args[1] for c in logger.write.call_args_list) == 1
+
+
+def test_mt5_cae_en_on_tick_el_latido_sale_como_mt5_down(monkeypatch):
+    from motor.broker import MT5NoDisponible
+    _entorno(monkeypatch)
+    db, engine = _doble_db({"params": {}}), _doble_engine()
+    engine.on_tick.side_effect = MT5NoDisponible("positions_get fallo")
+    botmain.trading_loop(db, engine, MagicMock(), StopDespues(1))
+    db.report.assert_called_with("MT5_DOWN")
