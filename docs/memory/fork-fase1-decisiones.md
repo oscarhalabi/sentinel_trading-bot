@@ -70,6 +70,10 @@ Guías: `docs/como-funciona.md` y `docs/convivencia-y-reemplazo.md`.
   la misma cuenta MT5 en un clon propio de `C:\MT5_instances_n1`. Las instancias viejas no se van a
   reactivar, así que no se añadió guarda extra. Antes de cada alta se revisa (solo lectura) que la
   cuenta no tenga posiciones abiertas de los bots viejos (magics 100100/100200).
+  Resultado 2026-11-03: 25556247 y 25924397 dan "Invalid account" en VantageMarkets-Demo (las
+  demos de Vantage caducan); no se dio de alta nada. Quedan creados en Supabase, sin filas,
+  `lozada.console+n1@gmail.com` (e48c9173...) y `webind.ve+n1@gmail.com` (65d2e5e1...) para usarlos
+  con cuentas demo nuevas.
 
 ## Pendientes conocidos (para Oscar)
 
