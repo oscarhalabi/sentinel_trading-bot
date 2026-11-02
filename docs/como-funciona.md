@@ -63,8 +63,8 @@ Explicado sin jerga. Para el plan de convivencia con producción ve a
    (`bot_positions`) y sus logs (`bot_logs`). Si el latido tiene más de ~60 s, la app web
    considera el proceso caído.
 3. **Configuración del motor.** Parámetros del motor en la tabla `engine_config` de Supabase
-   (campo JSON `params`). **La migración `n1_001` todavía no está aplicada** (espera a que
-   Daniel la revise); hasta entonces el motor corre con configuración vacía.
+   (campo JSON `params`). La migración `n1_001` que crea esa tabla está aplicada
+   (2026-11-02). Si un motor no tiene fila ahí, corre con configuración vacía.
 4. **Identidad.** Todo se filtra por `user_id` + `bot_id`. Dos motores en la misma cuenta se
    distinguen en MT5 por su magic (`MAGIC_N1=300100`, `MAGIC_N2=300200`) y nunca se ven las
    posiciones del otro.

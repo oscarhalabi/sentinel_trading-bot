@@ -26,8 +26,8 @@ motores sobre la misma cuenta MT5 (hoy `n1` y `n2`, ambos nulos: no abren operac
    con un estilo neutro. `ERROR`, `SYSTEM` y `SHADOW` siguen existiendo.
 3. **Configuración:** no usa `bot_config` (esa tabla es del bot viejo y no se toca). El motor
    nuevo lee la tabla **`engine_config`** (`user_id`, `bot_id`, `params` JSON, `is_active`),
-   creada por `migrations/n1_001_engine_config.sql` (**pendiente de aplicar** hasta que Daniel la
-   revise). En Fase 1 basta con mostrar/editar el JSON `params` de forma simple.
+   creada por `migrations/n1_001_engine_config.sql` (aplicada el
+   2026-11-02). En Fase 1 basta con mostrar/editar el JSON `params` de forma simple.
 4. **Partes de la app fijas a `m15`/`m5`:** las métricas de cuenta prefieren la fila `m15` y
    caen a `m5`; los conteos por motor y el signup (siembra `m15`+`m5`) también. Un usuario con
    solo `n1` se ve vacío hasta que se cambie. Pedido: elegir la fila de métricas de cuenta

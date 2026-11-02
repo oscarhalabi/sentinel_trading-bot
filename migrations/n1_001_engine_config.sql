@@ -15,9 +15,8 @@
 --   Solo crea una tabla (y su seguridad). No cambia, borra ni renombra nada
 --   de lo que usan m15, m5 o e2. Se puede correr mas de una vez sin dano.
 --
--- NO APLICAR todavia: esta migracion NO se aplica hasta que Daniel apruebe
---   el PR. Se aplica a mano en el SQL editor de Supabase y se anota en
---   docs/memory/.
+-- ESTADO: APLICADA el 2026-11-02 por Daniel, a mano en el SQL editor de
+--   Supabase, despues de correr las consultas de abajo (todo coincidio).
 --
 -- RESULTADO DE LA REVISION DEL ESQUEMA (solo leyendo archivos, sin tocar
 -- Supabase): en supabase_schema.sql, migrations/002-009 de este repo y

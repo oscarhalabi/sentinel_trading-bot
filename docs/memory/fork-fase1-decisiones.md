@@ -29,7 +29,7 @@ Guías: `docs/como-funciona.md` y `docs/convivencia-y-reemplazo.md`.
   de producción toma toda fila PENDING. Insertar-si-falta (nunca pisa filas existentes). Cada cuenta
   demo = usuario de Supabase nuevo, para que `account_settings` no se cruce.
 - **Supabase solo aditivo:** `migrations/n1_001_engine_config.sql` (tabla `engine_config`, `params`
-  JSONB por usuario y motor). `bot_config` no se toca.
+  JSONB por usuario y motor). `bot_config` no se toca. **Aplicada el 2026-11-02 por Daniel.**
 - **Postgres local** (`sentinel_n1`, rol `sentinel_n1`): `motor/localdb.py` registra eventos
   (`engine_events`), best-effort: si falla, el bot sigue. Migraciones en `localdb/migrations/`,
   se aplican con `python -m scripts.localdb_migrate`. El sincronizador a Supabase y el "local-primero"
@@ -58,10 +58,11 @@ Guías: `docs/como-funciona.md` y `docs/convivencia-y-reemplazo.md`.
    de base real nunca se han ejecutado. Pasos en `docs/como-funciona.md`.
 2. **Cuenta demo de Vantage + usuario nuevo de Supabase**, y darla de alta con
    `python -m scripts.provision alta ... --bots n1,n2`.
-3. **Aplicar `migrations/n1_001_engine_config.sql`** solo después de que Daniel revise el PR (correr antes
-   las consultas "ANTES DE APLICAR" contra la base real). Anotarlo aquí cuando se aplique.
-4. **PR de la app web (Tarea 11)** pendiente: quitar lo fijo a `m15`/`m5` en `lozadaitm/sentinel_trading-webapp`
-   para que un usuario solo-`n1` se vea completo. Rama + PR revisado por Daniel + preview de Vercel.
+3. ~~Aplicar `migrations/n1_001_engine_config.sql`~~ Hecho: aplicada en Supabase el 2026-11-02 por Daniel, tras correr las consultas "ANTES DE APLICAR" (todas dieron lo esperado: sin CHECK/enum/trigger sobre bot_id, op_type, log_type ni bots). Verificado después: tabla con
+   sus 6 columnas, RLS activo y política `engine_config_owner`.
+4. ~~PR de la app web (Tarea 11)~~ Hecho: lozadaitm/sentinel_trading-webapp#1 aprobado por Daniel y
+   mergeado el 2026-11-02 (desplegado en Vercel). El preview del PR no se generó porque el autor de los
+   commits (`oscarhalabi`) no tiene acceso al proyecto en Vercel.
 5. **Proteger `main` en GitHub** (Settings, Branches, Require a pull request before merging).
 6. Registrar la tarea del vigilante en el servidor con `scripts\instalar_tareas.ps1` (una persona, tras `-DryRun`).
 7. Verificación final de Fase 1 con producción viva: `restart_motor.ps1 -DryRun` lista cero procesos de producción.

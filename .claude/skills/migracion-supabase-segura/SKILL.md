@@ -27,8 +27,8 @@ romperlos. Reglas:
 7. **Anotar en la memoria**: nota en `docs/memory/` (qué se aplicó, fecha, quién) y línea en
    `docs/memory/MEMORY.md`; ver skill `actualizar-memoria`. Marcar la cabecera del archivo como aplicada.
 
-Estado actual: `migrations/n1_001_engine_config.sql` (tabla `engine_config`) está escrita y
-**NO aplicada** hasta que Daniel la apruebe.
+Estado actual: `migrations/n1_001_engine_config.sql` (tabla `engine_config`) está **aplicada**
+(2026-11-02, por Daniel). La próxima migración del bot nuevo es `n1_002`.
 
 Nota: la base local de Postgres (`localdb/migrations/NNN_*.sql`, se aplican con
 `python -m scripts.localdb_migrate`) es otra cosa: no es compartida y no pasa por esta skill.
