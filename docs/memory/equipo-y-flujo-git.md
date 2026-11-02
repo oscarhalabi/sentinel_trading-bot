@@ -20,6 +20,12 @@ servidor y app web llevan una explicación clara de qué cambia y por qué.
 - Tags en cada paso a producción: `vN-AAAA-MM-DD`.
 - Identidad por commit: el VPS no tiene identidad global de git; cada commit lleva la de quien
   lo pide (`git -c user.name=... -c user.email=...`; Oscar: `Oscar <oscarhalabi@proton.me>`).
+- **Cuentas de GitHub en el VPS** (2026-11-02): `gh` tiene guardadas `oscarhalabi` (puede subir
+  al fork) y `lozadaitm` (Daniel; repo original y app web, sin permiso de escritura en el fork).
+  Antes de un push: `gh auth status` y, si hace falta, `gh auth switch --user <cuenta>`.
+- **Una carpeta por repo** en el VPS (pedido de Daniel, 2026-10-30): `Documents\sentinel_trading`
+  (producción, no tocar), `Documents\sentinel_trading-bot` (fork) y `Documents\sentinel_trading-webapp`
+  (app web, se queda en `main`). Se cambia de rama dentro de la carpeta, sin worktrees extra.
 - Lo bueno se manda después como PR al repo original `lozadaitm/sentinel_trading-bot`.
 - Webapp (`lozadaitm/sentinel_trading-webapp`): rama y PR revisado por Daniel, probado en el
   preview de Vercel; nunca push directo a su `main`.

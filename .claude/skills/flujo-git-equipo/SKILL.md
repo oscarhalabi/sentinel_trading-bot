@@ -8,6 +8,8 @@ description: Usar cuando haya que crear una rama, hacer commit, abrir un PR, ped
 Reglas: `main` estable, nunca push directo, una rama por tema, PR revisado por la otra persona.
 
 ## 1. Rama
+Una sola carpeta por repo en el VPS (`Documents\sentinel_trading-bot`, `Documents\sentinel_trading-webapp`):
+se cambia de rama dentro de esa carpeta, sin crear carpetas extra (worktrees).
 ```bash
 git switch main && git pull
 git switch -c fase1/<tema>        # o datos/<tema>, fix/<tema>, docs/<tema>
@@ -23,6 +25,13 @@ git -c user.name="Oscar" -c user.email="oscarhalabi@proton.me" commit -m "docs(f
 indique el entorno. Antes de commitear: `python -m pytest -q`.
 
 ## 3. PR
+Antes de subir, comprobar con qué cuenta de GitHub está la terminal. En el VPS hay dos
+guardadas: `oscarhalabi` (dueño del fork, el único que puede subir aquí) y `lozadaitm`
+(Daniel, dueño del repo original y de la app web).
+```bash
+gh auth status                    # muestra cuál está activa
+gh auth switch --user oscarhalabi # para el fork; --user lozadaitm para la app web
+```
 ```bash
 git push -u origin <rama>
 gh pr create --base main --title "..." --body "..."
