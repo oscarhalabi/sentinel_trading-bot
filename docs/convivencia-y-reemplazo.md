@@ -102,10 +102,10 @@ convivan:
 
 - Solo cambios **aditivos**. La migración del bot nuevo es
   `migrations/n1_001_engine_config.sql` (tabla `engine_config`).
-  **Todavía NO está aplicada**: se aplica cuando Daniel apruebe el PR. Antes de aplicar hay
-  que correr las consultas de solo lectura de la sección "ANTES DE APLICAR" de ese archivo
-  (que la tabla no exista ya, que no haya restricciones sobre `bot_id`/`op_type`/`log_type`/`bots`,
-  etc.), porque producción aplicó migraciones 010-017 que no están en este repo.
+  **Aplicada el 2026-11-02 por Daniel**, después de correr las consultas de solo lectura de la
+  sección "ANTES DE APLICAR" de ese archivo (que la tabla no existiera, que no hubiera
+  restricciones sobre `bot_id`/`op_type`/`log_type`/`bots`, etc.). Las próximas migraciones
+  siguen el mismo camino, porque producción aplicó migraciones 010-017 que no están en este repo.
 - La app web (`lozadaitm/sentinel_trading-webapp`) tiene partes fijas a `m15`/`m5` (métricas de
   cuenta, conteos por motor, el alta de usuarios). Los cambios para que un usuario solo-`n1`
   se vea completo van en un PR aparte en ese repo (revisado por Daniel y probado en el preview
