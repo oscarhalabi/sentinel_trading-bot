@@ -404,3 +404,16 @@ def test_mt5_cae_en_on_tick_el_latido_sale_como_mt5_down(monkeypatch):
     engine.on_tick.side_effect = MT5NoDisponible("positions_get fallo")
     botmain.trading_loop(db, engine, MagicMock(), StopDespues(1))
     db.report.assert_called_with("MT5_DOWN")
+
+
+def test_nulo_registra_vivo_en_la_base_local():
+    eng = NullEngine(MagicMock(), MagicMock())
+    eng.localdb = MagicMock()
+    eng.on_tick()
+    eng.on_tick()                      # dentro de los 60 s: no repite
+    eng.localdb.record_event.assert_called_once()
+    assert eng.localdb.record_event.call_args.args[0] == "vivo"
+
+
+def test_nulo_sin_base_local_no_falla():
+    NullEngine(MagicMock(), MagicMock()).on_tick()

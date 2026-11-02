@@ -1,0 +1,10 @@
+time,type,message,price,lots,balance,ticket
+2026.11.03 00:15:36,SYSTEM,AVISO: base local desactivada (no hay LOCAL_PG_DSN). El bot sigue sin ella.,0.00,0.00,0.00,0
+2026.11.03 00:15:36,SYSTEM,NullEngine INICIADO. bot_id=n2 magic=300200 user=prueba@sentinel.test symbol=XAUUSD+,0.00,0.00,5000.00,0
+2026.11.03 00:15:36,ERROR,APERTURAS BLOQUEADAS: AutoTrading DESACTIVADO en el terminal. Pulsa el boton 'Algo Trading' (Ctrl+E); debe quedar en verde.,0.00,0.00,5000.00,0
+2026.11.03 00:15:36,SYSTEM,Motor nulo vivo,0.00,0.00,0.00,0
+2026.11.03 00:15:36,SYSTEM,Estado del bot: FLAT.,0.00,0.00,0.00,0
+2026.11.03 00:16:45,SYSTEM,NullEngine INICIADO. bot_id=n2 magic=300200 user=prueba@sentinel.test symbol=XAUUSD+,0.00,0.00,5000.00,0
+2026.11.03 00:16:45,SYSTEM,Motor nulo vivo,0.00,0.00,0.00,0
+2026.11.03 00:16:45,SYSTEM,Estado del bot: FLAT.,0.00,0.00,0.00,0
+2026.11.03 00:17:46,SYSTEM,Motor nulo vivo,0.00,0.00,0.00,0

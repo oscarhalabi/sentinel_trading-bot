@@ -27,16 +27,24 @@ class NullEngine:
         self.symbols = (config.SYMBOL,)          # main.setup lo reasigna segun el registro
         self.hud = {"status": "Motor nulo: sin estrategia"}
         self._ultimo_latido = 0.0
+        self.localdb = None                      # main.setup la conecta (puede no haber base)
 
     def init_history_cursor(self):
         """Sin historial propio que recorrer."""
 
     def on_tick(self):
-        """No envia ordenes; solo avisa cada 60 s que sigue vivo."""
+        """No envia ordenes; cada 60 s avisa que sigue vivo (log y base local).
+
+        El evento "vivo" en la base local prueba de punta a punta que el motor
+        escribe en Postgres (best-effort: sin base, no pasa nada).
+        """
         ahora = time.time()
         if ahora - self._ultimo_latido >= LATIDO_SEGUNDOS:
             self._ultimo_latido = ahora
             self.logger.write("SYSTEM", "Motor nulo vivo")
+            if self.localdb is not None:
+                self.localdb.record_event("vivo", {"activo": self.is_active,
+                                                   "solo_cierre": self.close_only})
 
     def close_all(self, reason):
         """Cierra las posiciones de su magic. True cuando no queda ninguna.
