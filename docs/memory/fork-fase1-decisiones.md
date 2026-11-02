@@ -66,9 +66,12 @@ Guías: `docs/como-funciona.md` y `docs/convivencia-y-reemplazo.md`.
 
 ## Pendientes conocidos (para Oscar)
 
-1. **Crear las bases de Postgres local** (`sentinel_n1` y `sentinel_n1_test`, rol `sentinel_n1`),
-   definir `LOCAL_PG_DSN` / `LOCAL_PG_DSN_TEST` y correr `python -m scripts.localdb_migrate`. Los 2 tests
-   de base real nunca se han ejecutado. Pasos en `docs/como-funciona.md`.
+1. ~~Crear las bases de Postgres local~~ Hecho el 2026-11-03 (Daniel): rol `sentinel_n1`, bases
+   `sentinel_n1` y `sentinel_n1_test` en Postgres 18 del VPS, variables de usuario de Windows
+   `LOCAL_PG_DSN` / `LOCAL_PG_DSN_TEST` y `001_base.sql` aplicada. Los tests de base real pasan.
+   Ojo: si la clave lleva signos (`#`, `!`, `$`, `@`...), en el DSN van codificados (`%23`...), y
+   en PowerShell `setx` con comillas simples. pgAdmin a veces muestra "Circular reference detected"
+   en `CREATE ROLE`/`ALTER ROLE`: comprobar siempre con `pg_roles` o probando la conexión.
 2. **Cuenta demo de Vantage + usuario nuevo de Supabase**, y darla de alta con
    `python -m scripts.provision alta ... --bots n1,n2`.
 3. ~~Aplicar `migrations/n1_001_engine_config.sql`~~ Hecho: aplicada en Supabase el 2026-11-02 por Daniel, tras correr las consultas "ANTES DE APLICAR" (todas dieron lo esperado: sin CHECK/enum/trigger sobre bot_id, op_type, log_type ni bots). Verificado después: tabla con
