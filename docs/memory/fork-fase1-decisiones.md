@@ -64,6 +64,13 @@ Guías: `docs/como-funciona.md` y `docs/convivencia-y-reemplazo.md`.
   9. En modo sombra el cierre forzado se da por hecho (antes reintentaba para siempre).
   10. Un solo lector de `.env` (`registry.read_env_file`) y un solo normalizador de rutas (`procs._norm`).
 
+- **Cuentas viejas desactivadas al bot nuevo (2026-11-03, decisión de Daniel):** las cuentas demo de
+  instancias de producción desactivadas (`instances\_*.env`, p.ej. 25556247 `lozada.console` y 25924397
+  `webind.ve`) se pasan al bot nuevo con **un usuario de Supabase nuevo por cuenta** (correo `+n1`) y
+  la misma cuenta MT5 en un clon propio de `C:\MT5_instances_n1`. Las instancias viejas no se van a
+  reactivar, así que no se añadió guarda extra. Antes de cada alta se revisa (solo lectura) que la
+  cuenta no tenga posiciones abiertas de los bots viejos (magics 100100/100200).
+
 ## Pendientes conocidos (para Oscar)
 
 1. ~~Crear las bases de Postgres local~~ Hecho el 2026-11-03 (Daniel): rol `sentinel_n1`, bases
