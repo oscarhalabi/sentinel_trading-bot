@@ -91,7 +91,10 @@ Guías: `docs/como-funciona.md` y `docs/convivencia-y-reemplazo.md`.
    mergeado el 2026-11-02 (desplegado en Vercel). El preview del PR no se generó porque el autor de los
    commits (`oscarhalabi`) no tiene acceso al proyecto en Vercel.
 5. **Proteger `main` en GitHub** (Settings, Branches, Require a pull request before merging).
-6. Registrar la tarea del vigilante en el servidor con `scripts\instalar_tareas.ps1` (una persona, tras `-DryRun`).
+6. ~~Registrar la tarea del vigilante~~ Hecho el 2026-11-03 (Daniel): `SentinelN1Vigilante` registrada.
 7. Verificación final de Fase 1 con producción viva: `restart_motor.ps1 -DryRun` lista cero procesos de producción.
+8. **Daniel: crear 2 cuentas demo nuevas en Vantage** para `lozada.console+n1@gmail.com` y
+   `webind.ve+n1@gmail.com` (usuarios ya creados en Supabase, sin filas). Con login/servidor/clave de
+   cada una se hace `provision alta ... --bots n1,n2` (las demos viejas 25556247 y 25924397 ya no existen).
 
 Contexto: [[fork-fresh-start]], [[equipo-y-flujo-git]].
