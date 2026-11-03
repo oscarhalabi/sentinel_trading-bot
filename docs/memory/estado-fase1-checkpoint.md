@@ -28,8 +28,11 @@ Checkpoint del 2026-11-03. Leer junto a [[fork-fase1-decisiones]] (allí están 
 ## Prueba punta a punta (Fase 1)
 
 1. Latido en menos de 30 s — OK.
-2. **Pendiente (Daniel):** desde el dashboard con prueba@sentinel.test encender/apagar n1 y n2, cierre
-   forzado y meta; luego verificar en Supabase y logs, y que el primer login no creó filas m15/m5.
+2. Dashboard — OK (Oscar, 2026-11-03, con prueba@sentinel.test): encender/apagar n1 y n2 por
+   separado, meta guardada (200 %), sin filas m15/m5. El botón "Forzar cierre" sale desactivado porque
+   no hay posiciones (los motores nulos no abren); el lado del bot se probó escribiendo en Supabase lo
+   mismo que el botón (`is_active=false, force_close=true`): n1 y n2 lo consumieron en 4 s.
+   Probar el botón de verdad cuando haya un motor que opere.
 3. Producción intacta — OK (mismos PIDs antes y después).
 4. Recuperación — OK: el vigilante relanzó n1 en 43 s; n2 reconectó el terminal en 47 s; tras un
    reinicio de producción (que mata también nuestros terminales) ambos volvieron en menos de 1 min.
@@ -38,8 +41,7 @@ Checkpoint del 2026-11-03. Leer junto a [[fork-fase1-decisiones]] (allí están 
 
 ## Próximos pasos
 
-1. Daniel hace la prueba 2; se anota el resultado aquí.
-2. Mergear el PR #1 del fork (`fase1/limpieza-multimotor`, ya aprobado) y poner tag `fase1-base-<fecha>`.
+1. ~~Prueba 2~~ y ~~merge del PR #1 + tag `fase1-base-2026-11-03`~~: hechos el 2026-11-03. Fase 1 cerrada.
 3. Alta de lozada.console+n1 cuando Daniel cree la demo.
 4. Detalles: AutoTrading apagado en los clones nuevos (Ctrl+E; `provision` no lo activa si el
    `common.ini` ya existe); proteger `main` en GitHub.
