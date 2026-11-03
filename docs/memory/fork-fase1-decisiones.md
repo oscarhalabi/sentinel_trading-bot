@@ -93,8 +93,10 @@ Guías: `docs/como-funciona.md` y `docs/convivencia-y-reemplazo.md`.
 5. **Proteger `main` en GitHub** (Settings, Branches, Require a pull request before merging).
 6. ~~Registrar la tarea del vigilante~~ Hecho el 2026-11-03 (Daniel): `SentinelN1Vigilante` registrada.
 7. Verificación final de Fase 1 con producción viva: `restart_motor.ps1 -DryRun` lista cero procesos de producción.
-8. **Daniel: crear 2 cuentas demo nuevas en Vantage** para `lozada.console+n1@gmail.com` y
-   `webind.ve+n1@gmail.com` (usuarios ya creados en Supabase, sin filas). Con login/servidor/clave de
-   cada una se hace `provision alta ... --bots n1,n2` (las demos viejas 25556247 y 25924397 ya no existen).
+8. **Daniel: crear la cuenta demo nueva en Vantage** para `lozada.console+n1@gmail.com` (usuario ya
+   creado en Supabase, sin filas). Con login/servidor/clave se hace `provision alta ... --bots n1,n2`
+   (las demos viejas 25556247 y 25924397 ya no existen).
+   `webind.ve+n1@gmail.com` ya está: demo 26374402 dada de alta el 2026-11-03, n1 y n2 corriendo
+   (inactivos, FLAT) con el clon `C:\MT5_instances_n1\mt5_26374402`.
 
 Contexto: [[fork-fresh-start]], [[equipo-y-flujo-git]].
