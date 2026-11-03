@@ -1,56 +1,59 @@
-"""Provisioner de instancias: convierte provision_requests PENDING en instancias reales.
+"""Alta manual de cuentas del bot nuevo (provisionador).
 
-El signup privado del dashboard (webapp: /signup?invite=CODIGO) crea el usuario en
-Supabase Auth, siembra bot_instances/bot_config y encola una fila en
-provision_requests con las credenciales MT5 que rellena el invitado. Este script
-(corre en el VPS, service-role) hace el resto:
+Da de alta UNA cuenta a mano desde la linea de comandos:
 
-  1. Clona la instalacion BASE de MetaTrader 5 a una carpeta propia del usuario
-     (modo portable: los datos viven dentro del clon, no en AppData).
-  2. Escribe instances/<user_id>.env con todos los valores (Supabase, identidad,
-     credenciales MT5, MT5_PORTABLE=true).
-  3. Marca la request como READY y BORRA mt5_password de la DB (la credencial
-     queda solo en el .env local del VPS).
+  1. Clona la instalacion BASE de MetaTrader 5 a una carpeta propia
+     (MT5_CLONES_DIR, por defecto C:\\MT5_instances_n1; modo portable).
+  2. Siembra el perfil IPC y habilita Algo Trading en el clon.
+  3. En Supabase crea SOLO lo que falte (nunca pisa filas existentes):
+     bot_instances (is_active=false) y engine_config (params={}) por cada
+     motor, y account_settings.
+  4. Escribe instances\\<user_id>.env (con la contrasena MT5; nunca se imprime).
 
-El arranque de los bots sigue siendo scripts\\start_all.ps1 (preflight + tests +
-auditorias): este script NO lanza motores por defecto; con --start lanza los de
-las instancias recien provisionadas en modo consola (sin preflight, para probar).
+El .env va AL FINAL y se escribe de golpe (archivo temporal + renombrado): el
+vigilante lanza cualquier instances\\*.env que vea, asi que solo debe aparecer
+cuando las filas de Supabase ya existen. Si algo falla antes, repetir el alta
+termina el trabajo (lo que ya existe no se toca).
 
-Uso (desde la raiz del repo, con SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY en el
-entorno, en el .env de la raiz, o presentes en algun instances/*.env):
+Este script NO lanza motores ni reinicia nada: las instancias nuevas las
+arranca el vigilante (scripts/vigilante.py). Tampoco toca la tarea programada
+de reinicio de produccion.
 
-    python -m scripts.provision            # procesa las PENDING y termina
-    python -m scripts.provision --watch    # queda vigilando (poll cada 60 s)
-    python -m scripts.provision --start    # ademas lanza los bots provisionados
+Modo PENDING / --watch ELIMINADO: mientras convivan los dos bots, el
+provisionador de produccion ya consulta provision_requests cada 5 minutos.
+Si este script tambien las procesara, los dos se pelearian por las mismas
+filas. Ese modo vuelve cuando el bot nuevo reemplace a produccion.
+
+Uso (desde la raiz del repo):
+
+    python -m scripts.provision alta --user-id <uuid> --email <e> --login <n> \\
+        --server <s> --password <p> --bots n1,n2 [--symbol XAUUSD+] [--label <t>] [--dry-run]
 
 Config por entorno:
-    MT5_BASE_DIR   instalacion base a clonar (default: C:\\Program Files\\MetaTrader 5)
-    MT5_CLONES_DIR carpeta raiz de los clones (default: C:\\MT5_instances)
+    MT5_BASE_DIR    instalacion base a clonar (default: C:\\Program Files\\MetaTrader 5)
+    MT5_CLONES_DIR  carpeta raiz de los clones (default: C:\\MT5_instances_n1)
+    SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY  (o en el .env raiz / algun instances/*.env)
 """
 
 import argparse
 import datetime
 import hashlib
 import os
+import re
 import shutil
-import subprocess
-import sys
-import time
+
+from motor.registry import (assert_usuario_propio, instance_env_files, load_registry, magic_for,
+                            parse_bots, read_env_file, validate_instance, validate_mt5_target)
+from scripts.procs import CLONES_PRODUCCION, _es_o_contiene
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 INSTANCES_DIR = os.path.join(ROOT, "instances")
 
 MT5_BASE_DIR = os.environ.get("MT5_BASE_DIR", r"C:\Program Files\MetaTrader 5")
-MT5_CLONES_DIR = os.environ.get("MT5_CLONES_DIR", r"C:\MT5_instances")
-
-# Tarea programada que tumba bots+terminales y relanza start_all tras
-# provisionar algo nuevo. Corre INTERACTIVA en la sesion del operador (las
-# TUIs y terminales necesitan ventana; este script corre como SYSTEM).
-# Vacia ("PROVISION_RESTART_TASK=") = no reiniciar nada automaticamente.
-RESTART_TASK = os.environ.get("PROVISION_RESTART_TASK", "SentinelRestart")
+MT5_CLONES_DIR = os.environ.get("MT5_CLONES_DIR", r"C:\MT5_instances_n1")
 
 ENV_TEMPLATE = """# Usuario: {label} / {email}
-# Generado por scripts/provision.py el {stamp} (request #{req_id}).
+# Generado por scripts/provision.py el {stamp}.
 # Una instancia = un usuario = una cuenta = un terminal MT5 (clon portable).
 
 # --- Supabase ---
@@ -63,8 +66,7 @@ SYMBOL={symbol}
 
 # --- Motores a levantar sobre esta cuenta ---
 BOTS={bots}
-MAGIC_M15=100100
-MAGIC_M5=100200
+{magics}
 
 # --- Terminal MetaTrader 5 (clon portable propio de este usuario) ---
 MT5_PATH={mt5_path}
@@ -72,22 +74,44 @@ MT5_LOGIN={mt5_login}
 MT5_SERVER={mt5_server}
 MT5_PASSWORD={mt5_password}
 MT5_PORTABLE=true
+MT5_CLONES_DIR={clones_dir}
 """
 
 
+def render_env(values: dict) -> str:
+    """Genera el texto del .env de la instancia (funcion pura).
+
+    values["magics"] = {bot_id: magic}; sale como MAGIC_<BOT_ID en mayusculas>=<n>.
+    """
+    magics = "\n".join(f"MAGIC_{b.upper()}={m}" for b, m in values["magics"].items())
+    return ENV_TEMPLATE.format(**{**values, "magics": magics})
+
+
+def clone_dir_for(login: str, clones_dir: str) -> str:
+    """Carpeta del clon MT5 de un login, dentro de clones_dir."""
+    return os.path.join(clones_dir, f"mt5_{login}")
+
+
 def _read_env_file(path):
-    values = {}
+    """El lector unico de .env (motor.registry), sin fallar si el archivo no existe."""
     try:
-        with open(path, encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith("#") or "=" not in line:
-                    continue
-                key, _, val = line.partition("=")
-                values[key.strip()] = val.strip().strip('"').strip("'")
+        return read_env_file(path)
     except OSError:
-        pass
-    return values
+        return {}
+
+
+_UUID = re.compile(r"[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}")
+
+
+def _escribir_env(env_path, contenido):
+    """Escribe el .env de golpe: temporal (no acaba en .env) + renombrado.
+
+    El vigilante nunca ve un .env a medio escribir.
+    """
+    tmp = env_path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(contenido)
+    os.replace(tmp, env_path)
 
 
 def _find_supabase_creds():
@@ -98,9 +122,7 @@ def _find_supabase_creds():
         return url, key
     candidates = [os.path.join(ROOT, ".env")]
     if os.path.isdir(INSTANCES_DIR):
-        for name in sorted(os.listdir(INSTANCES_DIR)):
-            if name.endswith(".env") and not name.startswith(("example", "template", "_")):
-                candidates.append(os.path.join(INSTANCES_DIR, name))
+        candidates.extend(instance_env_files(INSTANCES_DIR))
     for path in candidates:
         vals = _read_env_file(path)
         if vals.get("SUPABASE_URL") and vals.get("SUPABASE_SERVICE_ROLE_KEY"):
@@ -208,9 +230,9 @@ def _seed_ipc_profile(clone_dir):
     print(f"    perfil IPC sembrado desde el base ({copied} entradas).")
 
 
-def _clone_mt5(login):
+def _clone_mt5(login, clones_dir):
     """Copia la instalacion base a un clon propio del login. Idempotente."""
-    clone_dir = os.path.join(MT5_CLONES_DIR, f"mt5_{login}")
+    clone_dir = clone_dir_for(login, clones_dir)
     exe = os.path.join(clone_dir, "terminal64.exe")
     if os.path.exists(exe):
         print(f"    clon MT5 ya existe: {clone_dir}")
@@ -223,144 +245,136 @@ def _clone_mt5(login):
             f"No existe la instalacion base de MT5 en {MT5_BASE_DIR} "
             f"(define MT5_BASE_DIR).")
     print(f"    clonando {MT5_BASE_DIR} -> {clone_dir} (puede tardar)...")
-    os.makedirs(MT5_CLONES_DIR, exist_ok=True)
+    os.makedirs(clones_dir, exist_ok=True)
     shutil.copytree(MT5_BASE_DIR, clone_dir)
     _seed_ipc_profile(clone_dir)
     _enable_algo_trading(clone_dir)
     return exe
 
 
-def _write_instance_env(req, mt5_path, supabase_url, supabase_key):
-    path = os.path.join(INSTANCES_DIR, f"{req['user_id']}.env")
-    if os.path.exists(path):
-        # No pisar un .env existente (podria tener ajustes manuales): se
-        # escribe una copia .new para que el operador la revise.
-        path = path + ".new"
-    content = ENV_TEMPLATE.format(
-        label=req.get("label") or "sin etiqueta",
-        email=req.get("email", ""),
-        stamp=datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
-        req_id=req["id"],
-        supabase_url=supabase_url,
-        supabase_key=supabase_key,
-        user_id=req["user_id"],
-        symbol=req.get("symbol") or "XAUUSD+",
-        bots=req.get("bots") or "m15,m5",
-        mt5_path=mt5_path,
-        mt5_login=req["mt5_login"],
-        mt5_server=req["mt5_server"],
-        mt5_password=req.get("mt5_password") or "",
-    )
-    os.makedirs(INSTANCES_DIR, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(content)
-    return path
+def _assert_engine_config_existe(client):
+    """Aborta si falta la tabla engine_config (migracion n1_001 sin aplicar).
 
-
-def _trigger_restart():
-    """Dispara el reinicio completo (scripts/restart_all.ps1) via la tarea
-    programada SentinelRestart: mata bots y terminales y relanza start_all
-    en la sesion del operador, ya con la(s) instancia(s) nueva(s) incluidas.
+    Se mira ANTES de escribir nada: si no, el alta quedaria a medias (el .env y
+    bot_instances escritos, engine_config no).
     """
-    if not RESTART_TASK:
-        print("PROVISION_RESTART_TASK vacio: sin reinicio automatico.")
-        return
     try:
-        subprocess.run(["schtasks", "/Run", "/TN", RESTART_TASK],
-                       check=True, capture_output=True, text=True)
-        print(f"Reinicio completo disparado (tarea '{RESTART_TASK}').")
-    except Exception as e:  # noqa: BLE001
-        print(f"No se pudo disparar el reinicio ('{RESTART_TASK}'): {e}. "
-              f"Lanza scripts\\restart_all.ps1 (o start_all.ps1) a mano.")
+        client.table("engine_config").select("user_id").limit(0).execute()
+    except Exception as e:  # noqa: BLE001  (cualquier fallo aqui deja el alta sin empezar)
+        raise SystemExit(
+            "[ABORTADO] No se puede leer la tabla engine_config: aplica primero "
+            f"migrations/n1_001 (con aprobacion de Daniel). Detalle: {e}"
+        ) from e
 
 
-def _start_instance(env_path, bots):
-    """Lanza los motores de la instancia en ventanas nuevas (modo consola)."""
-    runner = os.path.join(ROOT, "scripts", "run_instance.ps1")
+def _upsert_supabase(client, user_id, bots, login, label):
+    """Crea las filas del usuario SOLO si faltan: repetir el alta nunca pisa nada
+    (ni is_active/label de una instancia ya encendida, ni params ya ajustados)."""
+    def _crear_si_falta(tabla, filtros, fila):
+        q = client.table(tabla).select("user_id")
+        for col, val in filtros.items():
+            q = q.eq(col, val)
+        if not q.limit(1).execute().data:
+            client.table(tabla).insert(fila).execute()
+
     for bot_id in bots:
-        module = "bot.main_m5" if bot_id == "m5" else "bot.main"
-        subprocess.Popen(
-            ["powershell", "-NoExit", "-ExecutionPolicy", "Bypass",
-             "-File", runner, env_path, "-BotId", bot_id, "-Module", module],
-            creationflags=subprocess.CREATE_NEW_CONSOLE,
-        )
-        time.sleep(1.5)
+        clave = {"user_id": user_id, "bot_id": bot_id}
+        _crear_si_falta("bot_instances", clave,
+                        {**clave, "is_active": False, "label": label,
+                         "account_login": int(login)})
+        _crear_si_falta("engine_config", clave, {**clave, "params": {}})
+    _crear_si_falta("account_settings", {"user_id": user_id}, {"user_id": user_id})
 
 
-def process_pending(client, *, start=False):
-    res = (client.table("provision_requests").select("*")
-           .eq("status", "PENDING").order("created_at").execute())
-    requests = res.data or []
-    if not requests:
-        print("Sin provision_requests PENDING.")
-        return 0
+def alta(args, *, client=None, instances_dir=INSTANCES_DIR, clones_dir=None):
+    """Da de alta una cuenta. Con args.dry_run solo muestra el plan (nada se escribe)."""
+    clones_dir = clones_dir or MT5_CLONES_DIR
+    if (_es_o_contiene(clones_dir, CLONES_PRODUCCION)
+            or _es_o_contiene(CLONES_PRODUCCION, clones_dir)):
+        raise SystemExit(
+            f"[ABORTADO] MT5_CLONES_DIR '{clones_dir}' coincide con la carpeta de "
+            f"produccion {CLONES_PRODUCCION}, la contiene o esta dentro de ella.")
+    if not re.fullmatch(r"[0-9]+", str(args.login)):
+        raise SystemExit(f"[ABORTADO] --login debe ser numerico (recibido: {args.login!r}).")
+    # El user_id se usa como nombre de archivo: solo se acepta un UUID (nada de rutas).
+    if not _UUID.fullmatch(str(args.user_id)):
+        raise SystemExit(f"[ABORTADO] --user-id debe ser el UUID del usuario de Supabase "
+                         f"(recibido: {args.user_id!r}).")
+    registro = load_registry()
+    bots = parse_bots(args.bots)
+    validate_instance(registro, bots, os.environ)
+    magics = {b: magic_for(registro[b], os.environ) for b in bots}
+    clone = clone_dir_for(args.login, clones_dir)
+    # Ni cuenta ni terminal de produccion (la misma regla que aplica el motor al arrancar).
+    validate_mt5_target({"MT5_PATH": os.path.join(clone, "terminal64.exe"),
+                         "MT5_LOGIN": str(args.login)})
+    label = args.label or f"Cuenta {args.login}"
+    env_path = os.path.join(instances_dir, f"{args.user_id}.env")
 
-    supabase_url, supabase_key = _find_supabase_creds()
-    done = 0
-    for req in requests:
-        rid = req["id"]
-        print(f"[{rid}] {req.get('email')} login={req.get('mt5_login')} "
-              f"server={req.get('mt5_server')} bots={req.get('bots')}")
-        try:
-            mt5_path = _clone_mt5(req["mt5_login"])
-            env_path = _write_instance_env(req, mt5_path, supabase_url, supabase_key)
-            print(f"    .env escrito: {env_path}")
-            client.table("provision_requests").update({
-                "status": "READY",
-                "error": None,
-                "mt5_password": None,  # la credencial queda SOLO en el .env del VPS
-                "provisioned_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-            }).eq("id", rid).execute()
-            done += 1
-            print("    READY (mt5_password borrada de la DB).")
-            if start:
-                bots = [b.strip() for b in (req.get("bots") or "m15").split(",") if b.strip()]
-                _start_instance(env_path, bots)
-                print(f"    motores lanzados: {bots}")
-        except Exception as e:  # noqa: BLE001  (una request mala no frena la cola)
-            print(f"    ERROR: {e}")
-            try:
-                client.table("provision_requests").update(
-                    {"status": "ERROR", "error": str(e)[:500]}
-                ).eq("id", rid).execute()
-            except Exception:  # noqa: BLE001
-                pass
-    return done
-
-
-def main():
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--watch", action="store_true",
-                        help="vigila la cola (poll cada 60 s) en vez de salir")
-    parser.add_argument("--start", action="store_true",
-                        help="lanza los bots de cada instancia provisionada (modo consola)")
-    args = parser.parse_args()
+    if args.dry_run:
+        print("[dry-run] no se clona, no se escribe y no se toca Supabase.")
+        print(f"  clon MT5 : {clone}")
+        print(f"  .env     : {env_path}")
+        print(f"  motores  : {', '.join(bots)}  magics: {magics}")
+        print(f"  Supabase : crea si falta bot_instances/engine_config x{len(bots)}, "
+              f"account_settings (usuario {args.user_id})")
+        print("  orden    : clon MT5, filas de Supabase y por ultimo el .env")
+        print(f"  cuenta   : login={args.login} server={args.server} password=******")
+        return
 
     url, key = _find_supabase_creds()
-    if not url or not key:
-        print("Faltan SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY (entorno, .env raiz "
-              "o algun instances/*.env).")
-        sys.exit(1)
+    if client is None:
+        if not url or not key:
+            raise SystemExit("[ABORTADO] Faltan SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY "
+                             "(entorno, .env raiz o algun instances/*.env).")
+        from supabase import create_client  # import tardio: mismo venv que el bot
+        client = create_client(url, key)
 
-    from supabase import create_client  # import tardio: mismo venv que el bot
-    client = create_client(url, key)
+    # Antes de clonar o escribir nada: el usuario no puede ser de produccion y la
+    # tabla engine_config tiene que existir.
+    assert_usuario_propio(client, args.user_id, registro)
+    _assert_engine_config_existe(client)
 
-    if args.watch:
-        print("Vigilando provision_requests (Ctrl+C para salir)...")
-        while True:
-            try:
-                done = process_pending(client, start=args.start)
-                if done and not args.start:
-                    _trigger_restart()
-            except KeyboardInterrupt:
-                raise
-            except Exception as e:  # noqa: BLE001
-                print(f"Error consultando la cola: {e}")
-            time.sleep(60)
-    else:
-        done = process_pending(client, start=args.start)
-        if done and not args.start:
-            _trigger_restart()
+    mt5_path = _clone_mt5(args.login, clones_dir)
+    # Primero Supabase: si falla, no queda ningun .env que el vigilante lance
+    # sin sus filas. Repetir el alta crea solo lo que falte.
+    _upsert_supabase(client, args.user_id, bots, args.login, label)
+    print("    filas de Supabase listas (bot_instances inactivas).")
+    contenido = render_env({
+        "label": label, "email": args.email,
+        "stamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "supabase_url": url, "supabase_key": key, "user_id": args.user_id,
+        "symbol": args.symbol, "bots": ",".join(bots), "magics": magics,
+        "mt5_path": mt5_path, "mt5_login": args.login, "mt5_server": args.server,
+        "mt5_password": args.password, "clones_dir": clones_dir,
+    })
+    if os.path.exists(env_path):
+        # No pisar un .env existente (podria tener ajustes manuales).
+        env_path += ".new"
+        print("    [AVISO] ya existia el .env de este usuario: el nuevo queda como .env.new "
+              "(comparalo y renombralo a mano si hace falta).")
+    os.makedirs(instances_dir, exist_ok=True)
+    _escribir_env(env_path, contenido)
+    print(f"    .env escrito: {env_path}")
+    print("    El vigilante lanzara la instancia.")
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="Alta manual de cuentas del bot nuevo")
+    sub = parser.add_subparsers(dest="cmd", required=True)
+    a = sub.add_parser("alta", help="da de alta una cuenta")
+    a.add_argument("--user-id", required=True)
+    a.add_argument("--email", required=True)
+    a.add_argument("--login", required=True)
+    a.add_argument("--server", required=True)
+    a.add_argument("--password", required=True)
+    a.add_argument("--bots", required=True, help="motores separados por coma, ej. n1,n2")
+    a.add_argument("--symbol", default="XAUUSD+")
+    a.add_argument("--label", default=None)
+    a.add_argument("--dry-run", action="store_true", dest="dry_run",
+                   help="muestra el plan sin clonar, escribir ni tocar Supabase")
+    args = parser.parse_args(argv)
+    alta(args)
 
 
 if __name__ == "__main__":

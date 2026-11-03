@@ -5,6 +5,8 @@ metadata:
   type: project
 ---
 
+> Nota Fase 1 (2026-10-28): Referencia de infraestructura del bot de producción. En este fork el NewsGuard está en `motor/news.py`, pero solo **lee** el JSON de `NEWS_CALENDAR_PATH` (lo escribe el `news_exporter` de producción). Ya no existe el EA MQL5.
+
 Fase 1 del filtro de noticias (11-ago-2026): bloqueo duro alrededor de noticias
 de importancia HIGH de USD (lo que mueve al oro), SIN escala continua todavía.
 La escala 0-1 (NRI: reducción de lote, bloqueo suave con override) es Fase 2 y
@@ -33,7 +35,7 @@ misma base que `tick.time` — sin zonas horarias.
   `NOTICIAS`) las aperturas dentro de ventana con tag [observacion] sin
   bloquear nada. Tras 2-4 rojas observadas, activar con flip de `news_enforce`
   en bot_config (Supabase), sin redeploy. Rollback = mismo flip.
-- Complementa al VCB ([[bot-design-constraints]]): VCB reactivo (la vela ya
+- Complementa al VCB: VCB reactivo (la vela ya
   explotó), NewsGuard predictivo (está agendada).
 
 Regresión: sección [16] de `python -m tests.test_m5_and_budget`.

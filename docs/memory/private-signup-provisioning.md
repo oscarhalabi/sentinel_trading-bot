@@ -5,6 +5,8 @@ metadata:
   type: project
 ---
 
+> Nota Fase 1 (2026-10-28): Describe producción. El bot nuevo NO usa `provision_requests` mientras convivan los dos (el provisionador de producción tomaría la solicitud); usa `python -m scripts.provision alta`. Ver `docs/convivencia-y-reemplazo.md`.
+
 Feature de 2026-08-12 (migración `migrations/008_signup_provisioning.sql`): el alta de
 usuarios ya no es manual.
 

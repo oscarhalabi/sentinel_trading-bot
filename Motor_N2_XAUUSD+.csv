@@ -1,0 +1,42 @@
+time,type,message,price,lots,balance,ticket
+2026.11.03 00:15:36,SYSTEM,AVISO: base local desactivada (no hay LOCAL_PG_DSN). El bot sigue sin ella.,0.00,0.00,0.00,0
+2026.11.03 00:15:36,SYSTEM,NullEngine INICIADO. bot_id=n2 magic=300200 user=prueba@sentinel.test symbol=XAUUSD+,0.00,0.00,5000.00,0
+2026.11.03 00:15:36,ERROR,APERTURAS BLOQUEADAS: AutoTrading DESACTIVADO en el terminal. Pulsa el boton 'Algo Trading' (Ctrl+E); debe quedar en verde.,0.00,0.00,5000.00,0
+2026.11.03 00:15:36,SYSTEM,Motor nulo vivo,0.00,0.00,0.00,0
+2026.11.03 00:15:36,SYSTEM,Estado del bot: FLAT.,0.00,0.00,0.00,0
+2026.11.03 00:16:45,SYSTEM,NullEngine INICIADO. bot_id=n2 magic=300200 user=prueba@sentinel.test symbol=XAUUSD+,0.00,0.00,5000.00,0
+2026.11.03 00:16:45,SYSTEM,Motor nulo vivo,0.00,0.00,0.00,0
+2026.11.03 00:16:45,SYSTEM,Estado del bot: FLAT.,0.00,0.00,0.00,0
+2026.11.03 00:17:46,SYSTEM,Motor nulo vivo,0.00,0.00,0.00,0
+2026.11.03 00:18:14,SYSTEM,NullEngine INICIADO. bot_id=n2 magic=300200 user=prueba@sentinel.test symbol=XAUUSD+,0.00,0.00,5000.00,0
+2026.11.03 00:18:14,SYSTEM,Motor nulo vivo,0.00,0.00,0.00,0
+2026.11.03 00:18:14,SYSTEM,Estado del bot: FLAT.,0.00,0.00,0.00,0
+2026.11.03 00:19:15,SYSTEM,Motor nulo vivo,0.00,0.00,0.00,0
+2026.11.03 00:20:15,SYSTEM,Motor nulo vivo,0.00,0.00,0.00,0
+2026.11.03 00:20:49,SYSTEM,Estado del bot: MT5_DOWN.,0.00,0.00,0.00,0
+2026.11.03 00:21:20,SYSTEM,MT5 sin respuesta: reconectando (intento 1).,0.00,0.00,0.00,0
+2026.11.03 00:21:20,SYSTEM,MT5 reconectado.,0.00,0.00,0.00,0
+2026.11.03 00:21:20,SYSTEM,Motor nulo vivo,0.00,0.00,0.00,0
+2026.11.03 00:21:20,SYSTEM,Estado del bot: FLAT.,0.00,0.00,0.00,0
+2026.11.03 00:22:20,SYSTEM,Motor nulo vivo,0.00,0.00,0.00,0
+2026.11.03 00:23:21,SYSTEM,Motor nulo vivo,0.00,0.00,0.00,0
+2026.11.03 00:24:21,SYSTEM,Motor nulo vivo,0.00,0.00,0.00,0
+2026.11.03 00:25:21,SYSTEM,Motor nulo vivo,0.00,0.00,0.00,0
+2026.11.03 00:26:22,SYSTEM,Motor nulo vivo,0.00,0.00,0.00,0
+2026.11.03 00:27:18,SYSTEM,Estado del bot: MT5_DOWN.,0.00,0.00,0.00,0
+2026.11.03 00:27:48,SYSTEM,MT5 sin respuesta: reconectando (intento 1).,0.00,0.00,0.00,0
+2026.11.03 00:27:52,SYSTEM,MT5 reconectado.,0.00,0.00,0.00,0
+2026.11.03 00:27:52,SYSTEM,Motor nulo vivo,0.00,0.00,0.00,0
+2026.11.03 00:27:52,SYSTEM,Estado del bot: FLAT.,0.00,0.00,0.00,0
+2026.11.03 00:28:52,SYSTEM,Motor nulo vivo,0.00,0.00,0.00,0
+2026.11.03 00:29:53,SYSTEM,Motor nulo vivo,0.00,0.00,0.00,0
+2026.11.03 00:30:54,SYSTEM,Motor nulo vivo,0.00,0.00,0.00,0
+2026.11.03 00:31:54,SYSTEM,Motor nulo vivo,0.00,0.00,0.00,0
+2026.11.03 00:32:55,SYSTEM,Motor nulo vivo,0.00,0.00,0.00,0
+2026.11.03 00:33:56,SYSTEM,Motor nulo vivo,0.00,0.00,0.00,0
+2026.11.03 00:34:56,SYSTEM,Motor nulo vivo,0.00,0.00,0.00,0
+2026.11.03 00:35:58,SYSTEM,Motor nulo vivo,0.00,0.00,0.00,0
+2026.11.03 00:36:58,SYSTEM,Motor nulo vivo,0.00,0.00,0.00,0
+2026.11.03 00:37:58,SYSTEM,Motor nulo vivo,0.00,0.00,0.00,0
+2026.11.03 00:38:59,SYSTEM,Motor nulo vivo,0.00,0.00,0.00,0
+2026.11.03 00:40:00,SYSTEM,Motor nulo vivo,0.00,0.00,0.00,0

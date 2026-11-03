@@ -5,6 +5,8 @@ metadata:
   type: project
 ---
 
+> Nota Fase 1 (2026-10-28): Describe el bot de producción (exp-1/e2: `bot/`, `m15`/`m5`). En este fork el paquete es `motor/` y los motores son `n1`/`n2`; lo de Supabase (service-role, `user_id`+`bot_id`, `is_active` = close-only) sigue igual. Las menciones a estrategia (hedge, healer, OP1...) son del bot viejo.
+
 El bot corre en Supabase (cloud) con multi-tenencia: **un proceso = un usuario = una cuenta
 Vantage = un terminal MT5**. `user_id` (UUID) = `auth.users.id`.
 
@@ -26,7 +28,7 @@ Vantage = un terminal MT5**. `user_id` (UUID) = `auth.users.id`.
   `_run_grinder` OP11), igual que `spread_high`/`vol_breaker`. **Hedge Lock (OP2), trailing,
   healer, profit banking y cierres siguen corriendo** (una OP1 abierta nunca queda desnuda).
   Por eso `on_tick()` corre siempre; nunca se hace pause+continue. Alineado con
-  [[bot-design-constraints]].
+  el diseño del bot viejo.
 
 **Logging cloud:** `db.log_sink` encola cada `write()` y un hilo flusher hace INSERT por lotes en
 `bot_logs` (no bloquea el motor; un INSERT REST son 50-200 ms). El CSV local queda como respaldo.

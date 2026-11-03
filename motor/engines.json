@@ -1,0 +1,20 @@
+{
+  "engines": [
+    {
+      "bot_id": "n1",
+      "engine_class": "motor.engines.nulo:NullEngine",
+      "magic_env": "MAGIC_N1",
+      "magic_default": 300100,
+      "symbols": null,
+      "description": "Motor nulo (esqueleto Fase 1)"
+    },
+    {
+      "bot_id": "n2",
+      "engine_class": "motor.engines.nulo:NullEngine",
+      "magic_env": "MAGIC_N2",
+      "magic_default": 300200,
+      "symbols": null,
+      "description": "Motor nulo (esqueleto Fase 1)"
+    }
+  ]
+}

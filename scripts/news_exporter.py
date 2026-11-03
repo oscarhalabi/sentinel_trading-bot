@@ -1,6 +1,6 @@
-"""Exportador de calendario economico para el NewsGuard (bot/news.py), en Python.
+"""Exportador de calendario economico para el NewsGuard (motor/news.py), en Python.
 
-Alternativa headless al EA MQL5 (scripts/CalendarExporter.mq5): en el VPS, colgar
+Alternativa headless a un EA de MQL5 (ya no esta en el repo): en el VPS, colgar
 un EA en un grafico de cada clon portable es fragil (el auto-arranque headless no
 adjunta el EA de forma fiable y la carpeta MQL5 del clon no comparte la Common que
 leen los bots). Este proceso hace lo mismo SIN depender de un grafico:
@@ -15,7 +15,7 @@ leen los bots). Este proceso hace lo mismo SIN depender de un grafico:
      (%APPDATA%\\MetaQuotes\\Terminal\\Common\\Files\\news_calendar.json), la
      UNICA ruta que leen todas las instancias Python de la maquina.
 
-El esquema de salida es identico al del EA MQL5, asi que bot/news.py y la
+El esquema de salida es identico al del EA MQL5, asi que motor/news.py y la
 regresion no cambian: {"generated_at", "server_time", "events":[{time, currency,
 importance, name}]} con time en epoch del servidor.
 

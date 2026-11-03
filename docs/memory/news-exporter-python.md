@@ -5,6 +5,8 @@ metadata:
   type: project
 ---
 
+> Nota Fase 1 (2026-10-28): Describe producción. En este fork `scripts/news_exporter.py` existe pero **no se lanza** (`start_all.ps1` no lo arranca ni `restart_motor.ps1` lo mata); el bot nuevo lee el JSON que escribe el de producción.
+
 Fix de 2026-08-13. Los bots logueaban `NewsGuard: calendario no disponible en
 ...\Common\Files\news_calendar.json` porque **ningun proceso producia ese JSON**:
 el productor de diseño era el EA `scripts/CalendarExporter.mq5`, que un humano

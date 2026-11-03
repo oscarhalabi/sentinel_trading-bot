@@ -1,3 +1,5 @@
+> **Nota (Fase 1, 2026-10-28):** este documento describe el bot de producción exp-1 (`m15`/`m5`). Se conserva como historia y como referencia del contrato con la base de datos. El bot nuevo (`n1`, `n2`...) se describe en `docs/como-funciona.md` y, para la app web, en la sección "Motores nuevos" de `docs/dashboard-handoff-multibot.md`.
+
 # Addendum — nueva tabla `bot_positions` (histórico + vivo de posiciones)
 
 > **Cómo usar este archivo.** Es un **prompt aditivo** para la instancia de Claude Code que ya está

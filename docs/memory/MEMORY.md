@@ -1,21 +1,15 @@
-- [Bot -$760 root cause](bot-760-root-cause.md) — Profit Banking desarmaba el hedge; auditoría redflags + fixes aplicados
-- [Bot design constraints](bot-design-constraints.md) — restricciones del usuario: no emergency-stop, no SL catastrófico, OP2 congela pérdida, healer cura con 90%
-- [Workflow implementar+commit](workflow-implement-then-commit.md) — cambios del bot: implementar→commit→push directo; no backtest sin pedirlo (arnés es bar-close, no testea spikes intra-vela)
-- [OP1 rojas: Healer vs reset](op1-red-closes-healer-vs-reset.md) — distinguir cierres rojos de OP1 por Healer (diseño) vs reset manual de balance, cruzando reporte con logs DB
-- [Healer comment en deal de cierre](healer-comment-on-close-deal.md) — "Healer Amputacion" vive en el deal OUT, nunca en una op abierta (55/55 son out)
-- [Cascade Healer+Unwind → stop-out](healer-unwind-hedge-cascade.md) — causa raíz de los 2 blowups: al abrir OP3, Healer+Unwind desarman el hedge y dejan la cesta desnuda (-20k en stop-outs)
-- [Presupuesto Healer acumulado](healer-budget-accumulates-across-cycles.md) — cursor congelado en core<3 acumula verdes cross-ciclo; por eso amputa OP1 en rojo tras rachas ganadoras
-- [Logging: taxonomía y ticket](logging-taxonomy-and-ticket.md) — log_types de bot_logs, columna ticket, aperturas en broker vs cierres en strategy; drift ts/created_at
+## Fork y Fase 1 (bot nuevo)
+- [Fork desde cero](fork-fresh-start.md) — 2026-10-28: se reconstruye la estrategia desde cero; qué se conserva/descarta, orden de las 5 fases; no usar conclusiones de exp-2
+- [Decisiones de la Fase 1](fork-fase1-decisiones.md) — motor/, registro de motores, aislamiento de producción, vigilante, altas a mano, migración n1_001 (aplicada 2026-11-02) y pendientes de Oscar
+- [Checkpoint Fase 1 (2026-11-03)](estado-fase1-checkpoint.md) — qué cuentas corren (correo ↔ cuenta ↔ bot), prueba punta a punta (Fase 1 cerrada) y próximos pasos
+- [Equipo y flujo git](equipo-y-flujo-git.md) — Oscar (estrategia/análisis) y Daniel (app web/servidor); ramas, PR, revisión cruzada, tags, identidad por commit
+
+## Infraestructura heredada (describen el bot de producción exp-1/e2; la mecánica sigue valiendo)
+- [Logging: taxonomía y ticket](logging-taxonomy-and-ticket.md) — log_types de bot_logs, columna ticket; las aperturas se etiquetan por comment `ETIQUETA|texto`
 - [Supabase + multi-instancia](supabase-multi-instance-model.md) — 1 proceso=1 usuario=1 cuenta; service-role bypassa RLS; is_active=false es close-only (no pause duro)
-- [Multi-bot: gobierno de margen](multi-bot-margin-governance.md) — M15 senior con Hedge Lock inbloqueable, M5 junior cede margen; coordinación vía magics en MT5, no por DB
-- [Unwind huérfana el hedge + estado por conteo](unwind-orphans-hedge-count-state.md) — auditoría 6-11 ago: Unwind bancaba la OP1 verde, el hedge huérfano se re-etiquetaba como OP1 (hedge-sobre-hedge, churn OP4); fix implementado: CycleLedger por roles (bot/ledger.py)
-- [M5 v2: régimen de rango](m5-range-regime-v2.md) — la mejora de lateralización vive en el M5 (M15 congelado): histéresis ADX, rango fractal M15, veto de ruptura, Surfer cede al M15
-- [NewsGuard Fase 1](newsguard-phase1.md) — bloqueo duro por rojas USD vía exportador MQL5→JSON; observación por default (`news_enforce=false`), M5 cierra pre-roja, L3 exento
-- [NewsGuard Fase 2 (NRI)](newsguard-phase2-nri.md) — diseño completo del índice 0-1 (bandas, override, curvas) PENDIENTE; solo se construye si los logs de la Fase 1 lo justifican
-- [Objetivo de ganancia + cierre forzado](profit-target-and-force-close.md) — account_settings (% objetivo por cuenta, equity vs base, claim atómico → email + close-only) y bot_instances.force_close (cierre manual asumiendo flotante); migración 004 pendiente de aplicar
-- [Retiros + comisión USDT](withdrawals-commission-usdt.md) — retiro declarado → comisión (% en billing_settings, solo operador) → pago USDT BEP20 verificado on-chain (tx hash, RPC BSC) → desbloqueo; deuda PENDING bloquea reactivación (dashboard + guard del bot); migración 007
-- [Signup privado + provisioner](private-signup-provisioning.md) — invitación de un solo uso → /signup recolecta credenciales MT5 → siembra filas + cola provision_requests → scripts/provision.py clona MT5 portable y escribe el .env (borra mt5_password de la DB); migración 008
-- [Clon MT5: sembrar perfil IPC](mt5-clone-ipc-profile-seed.md) — clones copiados dan IPC timeout (-10005) porque les falta el perfil de runtime maduro del base; fix: provision siembra el config (excepto accounts.dat/common.ini); portable no era la causa
-- [Exportador de noticias en Python](news-exporter-python.md) — scripts/news_exporter.py alimenta el JSON del NewsGuard desde Forex Factory en tiempo de servidor (offset via MT5); reemplaza el EA MQL5 headless; lo lanza start_all, lo mata restart_all
-- [Pendientes pre-experimento-2](pendientes-pre-experimento-2.md) — exp-1-grinder congelada como producción (13-oct-2026, tag prod-v20-2026-10-13); esta carpeta corre el VPS, nunca cambiar de rama aquí; lista de 7 pendientes heredados
-- [Ideas experimento-2](ideas-experimento-2.md) — backlog sin verificar: auditoría 3 cuentas, Kronos, alpha decay (racha OP4 + Sharpe), sesiones, APILayer, MiroFish, AMD, carrusel arnés de agentes
+- [NewsGuard Fase 1](newsguard-phase1.md) — bloqueo duro por rojas USD vía JSON de calendario; observación por default (`news_enforce=false`)
+- [Exportador de noticias en Python](news-exporter-python.md) — scripts/news_exporter.py alimenta el JSON del NewsGuard; lo corre producción, el bot nuevo solo lo lee
+- [Objetivo de ganancia + cierre forzado](profit-target-and-force-close.md) — account_settings (% objetivo, claim atómico → email + close-only) y bot_instances.force_close; migración 004
+- [Retiros + comisión USDT](withdrawals-commission-usdt.md) — retiro declarado → comisión → pago USDT BEP20 verificado on-chain → desbloqueo; deuda PENDING bloquea reactivación; migración 007
+- [Signup privado + provisioner](private-signup-provisioning.md) — invitación de un solo uso → /signup → cola provision_requests → provisioner clona MT5 y escribe el .env; migración 008 (el bot nuevo usa `provision alta` a mano)
+- [Clon MT5: sembrar perfil IPC](mt5-clone-ipc-profile-seed.md) — los clones dan IPC timeout (-10005) si falta el perfil de runtime; provision siembra el config

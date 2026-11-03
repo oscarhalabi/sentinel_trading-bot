@@ -5,6 +5,8 @@ metadata:
   type: project
 ---
 
+> Nota Fase 1 (2026-10-28): Describe la app web + Supabase compartidos (migración 007). Sigue vigente; el bot nuevo respeta el bloqueo por deuda PENDING igual que el viejo.
+
 Feature de 2026-08-12 (migración `migrations/007_withdrawals.sql`): el usuario retira
 fondos por su cuenta desde Vantage, pero **declara** el retiro en el dashboard
 (`/dashboard/retiros`) para calcular la comisión del servicio. Modelo de confianza:

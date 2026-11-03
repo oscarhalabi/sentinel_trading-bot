@@ -5,6 +5,8 @@ metadata:
   type: project
 ---
 
+> Nota Fase 1 (2026-10-28): Sigue vigente: `scripts/provision.py` de este fork siembra el perfil IPC igual, en `C:\MT5_instances_n1`.
+
 Diagnóstico de 2026-08-13. `start_all.ps1` fallaba en FASE 3 con
 `No se pudo inicializar MT5: (-10005, 'IPC timeout')` en `audit_margin` sobre los
 clones nuevos.
