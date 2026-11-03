@@ -90,7 +90,8 @@ Guías: `docs/como-funciona.md` y `docs/convivencia-y-reemplazo.md`.
 4. ~~PR de la app web (Tarea 11)~~ Hecho: lozadaitm/sentinel_trading-webapp#1 aprobado por Daniel y
    mergeado el 2026-11-02 (desplegado en Vercel). El preview del PR no se generó porque el autor de los
    commits (`oscarhalabi`) no tiene acceso al proyecto en Vercel.
-5. **Proteger `main` en GitHub** (Settings, Branches, Require a pull request before merging).
+5. ~~Proteger `main` en GitHub~~ Hecho el 2026-11-03 (pedido por Oscar): PR obligatorio, sin force-push
+   ni borrado, 0 aprobaciones (Daniel no es colaborador del fork; si se añade, subir a 1).
 6. ~~Registrar la tarea del vigilante~~ Hecho el 2026-11-03 (Daniel): `SentinelN1Vigilante` registrada.
 7. Verificación final de Fase 1 con producción viva: `restart_motor.ps1 -DryRun` lista cero procesos de producción.
 8. **Daniel: crear la cuenta demo nueva en Vantage** para `lozada.console+n1@gmail.com` (usuario ya

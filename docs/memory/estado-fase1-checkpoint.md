@@ -42,10 +42,24 @@ Checkpoint del 2026-11-03. Leer junto a [[fork-fase1-decisiones]] (allí están 
 ## Próximos pasos
 
 1. ~~Prueba 2~~ y ~~merge del PR #1 + tag `fase1-base-2026-11-03`~~: hechos el 2026-11-03. Fase 1 cerrada.
-3. Alta de lozada.console+n1 cuando Daniel cree la demo.
-4. Detalles: AutoTrading apagado en los clones nuevos (Ctrl+E; `provision` no lo activa si el
-   `common.ini` ya existe); proteger `main` en GitHub.
-5. Después: brainstorming de la Fase 2 (datos históricos).
+2. Pueden esperar (los motores nulos no operan): alta de lozada.console+n1 cuando Daniel cree la demo,
+   y AutoTrading apagado en los clones nuevos (Ctrl+E; `provision` no lo activa si el `common.ini` ya
+   existe). Hay que hacerlos antes de que un motor opere.
+3. Después: brainstorming de la Fase 2 (datos históricos).
 
-**Cómo aplicar:** al retomar, empezar por el paso 1 o el que el equipo indique; antes de tocar procesos,
+## Avisar a Daniel la próxima vez que escriba (pedido por Oscar, 2026-11-03)
+
+Oscar pidió que, cuando Daniel escriba, se le cuente esto (y luego se borre esta sección):
+- La Fase 1 está cerrada: Oscar hizo la prueba del dashboard, el cierre forzado se probó del lado del
+  bot, el PR #1 del fork se mergeó (`450fc60`) y existe el tag `fase1-base-2026-11-03`.
+- **`main` del fork está protegido**: todo entra por PR, sin force-push ni borrado. Sin aprobación
+  obligatoria porque Daniel no es colaborador del fork (su aprobación no cuenta para GitHub y Oscar
+  no puede aprobar sus propios PR). Si Oscar lo añade como colaborador, se sube a 1 aprobación.
+- **Logs CSV de los motores** (PR `fix/logs-por-cuenta`): `Motor_N1_XAUUSD+.csv` y `Motor_N2_...` se
+  habían colado en git por error y además mezclaban cuentas (prueba y webind.ve escribían en el mismo
+  archivo). Ahora van a `logs\Motor_<MOTOR>_<LOGIN>_<SÍMBOLO>.csv`, uno por motor y cuenta, y no se
+  versionan. Los CSV viejos de la raíz quedan en disco (ignorados); se pueden borrar cuando se quiera.
+  Los motores usan el nombre nuevo al reiniciarse.
+
+**Cómo aplicar:** al retomar, ver la sección "Avisar a Daniel" y los próximos pasos; antes de tocar procesos,
 foto de PIDs de producción (skill `lanzar-bot-nuevo`).
