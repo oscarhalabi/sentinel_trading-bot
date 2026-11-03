@@ -87,8 +87,8 @@ Detalle y motivos en `docs/convivencia-y-reemplazo.md`.
 - Webapp (`lozadaitm/sentinel_trading-webapp`, clon en `C:\Users\Administrator\Documents\sentinel_trading-webapp`):
   rama + PR revisado por Daniel, probado en el preview de Vercel. Lo que ven hoy los
   usuarios `m15`/`m5` no debe cambiar.
-- Proteger `main` en GitHub: Settings, Branches, regla para `main`, marcar
-  "Require a pull request before merging".
+- `main` del fork está protegido en GitHub (desde 2026-11-03): PR obligatorio, sin force-push ni
+  borrado. Sin aprobación obligatoria mientras Daniel no sea colaborador del fork.
 - No hacer push ni registrar tareas programadas sin que lo pida una persona.
 
 ## Memoria y skills

@@ -1,7 +1,7 @@
 """Logger equivalente a WriteLog del MQL5: consola + CSV.
 
 CSV: time, type, message, price, lots, balance, ticket  (separador coma).
-Archivo: <log_file_name>_<symbol>.csv (modo append).
+Archivo: <log_file_name>_<symbol>.csv (modo append; crea la carpeta si falta).
 """
 
 import csv
@@ -21,6 +21,9 @@ class Logger:
         if enable_file:
             safe_symbol = symbol.replace("/", "_")
             self.path = f"{file_name}_{safe_symbol}.csv"
+            carpeta = os.path.dirname(self.path)
+            if carpeta:
+                os.makedirs(carpeta, exist_ok=True)
             if not os.path.exists(self.path):
                 with open(self.path, "w", newline="", encoding="ansi", errors="replace") as f:
                     csv.writer(f).writerow(

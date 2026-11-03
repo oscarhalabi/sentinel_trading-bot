@@ -417,3 +417,23 @@ def test_nulo_registra_vivo_en_la_base_local():
 
 def test_nulo_sin_base_local_no_falla():
     NullEngine(MagicMock(), MagicMock()).on_tick()
+
+
+def test_log_csv_uno_por_cuenta_y_motor(monkeypatch):
+    """Dos cuentas con el mismo motor no deben escribir en el mismo CSV."""
+    import os
+    monkeypatch.setattr(config, "BOT_ID", "n1")
+    monkeypatch.setattr(config, "MT5_LOGIN", "26358022")
+    a = botmain._log_file_name()
+    monkeypatch.setattr(config, "MT5_LOGIN", "26374402")
+    b = botmain._log_file_name()
+    assert a != b
+    assert a == os.path.join("logs", "Motor_N1_26358022")
+
+
+def test_logger_crea_la_carpeta_del_csv(tmp_path):
+    from motor.logger import Logger
+    log = Logger(file_name=str(tmp_path / "logs" / "Motor_N1_1"), symbol="XAUUSD+",
+                 console_print=False)
+    log.write("SYSTEM", "hola")
+    assert (tmp_path / "logs" / "Motor_N1_1_XAUUSD+.csv").exists()

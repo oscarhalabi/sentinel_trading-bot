@@ -13,7 +13,7 @@ servidor y app web llevan una explicación clara de qué cambia y por qué.
 
 **Flujo git acordado (2026-10-28):**
 - `main` del fork (`oscarhalabi/sentinel_trading-bot`) se mantiene estable; **sin push directo**
-  (proteger la rama en GitHub: Settings, Branches, "Require a pull request").
+  (protegida en GitHub desde 2026-11-03: PR obligatorio, sin force-push ni borrado).
 - Una rama por tema (`faseN/<tema>`, `datos/<tema>`) y un PR revisado por la otra persona (o
   primero revisión de Claude).
 - Commits en español, `tipo(ámbito): mensaje`.

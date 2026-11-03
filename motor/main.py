@@ -55,8 +55,15 @@ def disable_quickedit():
 
 
 def _log_file_name():
-    """Nombre del CSV local: uno por bot, para no mezclar motores en un mismo log."""
-    return f"Motor_{config.BOT_ID.upper()}"
+    """Nombre del CSV local, en logs/: uno por motor y cuenta.
+
+    Lleva el login para que dos cuentas con el mismo motor (p.ej. n1) no
+    escriban mezcladas en el mismo archivo.
+    """
+    nombre = f"Motor_{config.BOT_ID.upper()}"
+    if config.MT5_LOGIN:
+        nombre += f"_{config.MT5_LOGIN}"
+    return os.path.join("logs", nombre)
 
 
 def setup(logger=None, engine_cls=None):

@@ -52,9 +52,10 @@ git tag v<N>-AAAA-MM-DD && git push origin v<N>-AAAA-MM-DD
 ```
 Después borrar la rama y anotar en `docs/memory/` lo que haya que recordar.
 
-## 6. Proteger `main` (una vez, en GitHub)
-Settings, Branches, Add branch protection rule para `main`, marcar "Require a pull request
-before merging" (y, si se quiere, "Require approvals").
+## 6. `main` protegido (hecho el 2026-11-03)
+Regla en GitHub: PR obligatorio, sin force-push ni borrado, 0 aprobaciones (Daniel no es
+colaborador del fork y Oscar no puede aprobar sus propios PR). Por eso no se puede hacer push
+directo a `main` ni mergear sin PR. Si Daniel pasa a colaborador, subir a 1 aprobación.
 
 ## Webapp
 `lozadaitm/sentinel_trading-webapp`: mismo flujo, PR revisado por Daniel y probado en el preview

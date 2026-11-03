@@ -10,8 +10,8 @@ instances/*.env.*
 # Intento previo (contiene credenciales y logica vieja)
 TRADING PYTHON.txt
 
-# Logs del bot
-#*.csv
+# Logs CSV de los motores (hoy van a logs/; Motor_*.csv cubre los viejos en la raiz)
+Motor_*.csv
 
 # Config local de Claude Code (allowlist de permisos por-maquina).
 # .claude/settings.json (compartido) SI se versiona si algun dia existe.
