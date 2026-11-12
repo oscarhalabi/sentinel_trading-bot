@@ -63,6 +63,21 @@ Rama `fase2/datos-historicos`, PR oscarhalabi/sentinel_trading-bot#3.
   `_registro/reserva.jsonl` hace fallar `verificar`/`catalogo estado`; huecos que cruzan medianoche se
   parten en dos; posibles colisiones de nombre canónico (revisar con la lista real).
 
+## Task 11 en la laptop (2026-11-12): lo que salió distinto
+
+- **Lista de instrumentos:** la URL y el Referer de `URL_INSTRUMENTOS` funcionan (JSONP de ~1 MB,
+  1604 instrumentos). Los grupos cuelgan unos de otros (`parent`): acciones por país bajo `STCK_CFD`,
+  índices bajo `IDX`, materias primas bajo `CMD`. No existe `FX_EXOTICS`: los exóticos van en
+  `FX_CROSSES`. Meta sigue como `FB.US`. El lector ya está corregido y hay 1599 símbolos en el registro.
+- **Supuesto roto: descarga libre de `datafeed.dukascopy.com`.** El primer día de XAUUSD
+  (2024-05-13) falló con HTTP 503. Al seguir probando, el saludo TLS tardaba 17–20 s o fallaba,
+  y después llegaron 429 ("Too Many Requests", que remite a
+  `wiki.dukascopy.com/en/development/data-export/`) y 503 en peticiones sueltas. Esa página no da
+  límites para `datafeed`: describe una exportación por **AWS S3 con "Requester Pays"** (bucket
+  `cfg-public-proper-wallaby`, eu-west-1), donde quien descarga paga el tráfico. Falta saber si el
+  bloqueo lo provocó nuestra primera ráfaga (4 en paralelo × 24 horas, con reintentos) o si ahora
+  limitan a todo el mundo. Hasta que Oscar decida cómo seguir, no se baja nada.
+
 ## Pendientes
 
 1. ~~Spec y plan de 2A~~ (PR #3 mergeado). Código de 2A en `datos/base-almacen`; falta la Task 11 en la laptop.
