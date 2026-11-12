@@ -29,6 +29,6 @@ Plan: `docs/superpowers/plans/2026-11-12-fase2-datos-historicos.md`. Rama del di
    y su servidor; la clave no se anota aquí. Se usará con `provision clon-datos` (Task 7 / Task 13) en
    `C:\MT5_instances_n1\mt5_datos`. La demo Standard opcional (7.10) sigue sin crear.
 4. R2 va en la cuenta de Cloudflare que ya tiene Oscar (buckets `sentinel-datos` y `sentinel-datos-vps`: en R2 las claves se limitan por bucket, no por carpeta).
-5. El PR del diseño lo abre Oscar a mano: desde la sesión de Claude en la nube, GitHub devuelve 403 al crear PRs.
+5. PR del diseño: oscarhalabi/sentinel_trading-bot#3 (2026-11-12). El 403 al crear PRs desde la nube se arregló cuando Oscar reconectó GitHub.
 
 **Cómo aplicar:** antes de implementar cualquier parte de `datos/`, leer el spec. Si un supuesto del spec resulta falso (profundidad, nombres, regla de hora), anotarlo aquí.
