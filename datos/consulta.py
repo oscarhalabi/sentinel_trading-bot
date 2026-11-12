@@ -150,13 +150,25 @@ def _vacia(esquema: pa.Schema) -> pa.Table:
     return pa.unify_schemas([esquema, extra]).empty_table()
 
 
-def conectar(cfg: Config | None = None) -> duckdb.DuckDBPyConnection:
+def conectar(cfg: Config | None = None,
+             incluir_reservado: bool = False) -> duckdb.DuckDBPyConnection:
     """Conexión DuckDB con las vistas `ticks` y `m1` sobre DATA_DIR (para consultas libres).
 
     Las vistas incluyen las columnas de partición `fuente`, `simbolo` y `anio`; filtrar por
-    ellas evita leer carpetas que no hacen falta. OJO: estas vistas no aplican la reserva.
+    ellas evita leer carpetas que no hacen falta. Por defecto las vistas cortan en la
+    reserva: `ticks` solo tiene `ts` anteriores al corte y `m1` solo velas que cierran
+    (ts + 1 minuto) como mucho en el corte. Con `incluir_reservado=True` se ve todo y el
+    acceso queda registrado (símbolo "*", rango completo).
     """
     cfg = cfg or cargar_config()
+    if incluir_reservado:
+        _registrar_acceso(cfg, "*", datetime.min.replace(tzinfo=timezone.utc),
+                          datetime.max.replace(tzinfo=timezone.utc))
+        filtros = {"ticks": "", "m1": ""}
+    else:
+        corte = f"TIMESTAMPTZ '{corte_reserva(cfg).isoformat()}'"
+        filtros = {"ticks": f" WHERE ts < {corte}",
+                   "m1": f" WHERE ts < {corte} AND ts + INTERVAL 1 MINUTE <= {corte}"}
     con = duckdb.connect()
     con.execute("SET TimeZone='UTC'")
     for tipo, esquema in (("ticks", ESQUEMA_TICKS), ("m1", ESQUEMA_M1)):
@@ -164,13 +176,12 @@ def conectar(cfg: Config | None = None) -> duckdb.DuckDBPyConnection:
         patron = (carpeta / "**" / "*.parquet").as_posix()
         if carpeta.is_dir() and any(carpeta.rglob("*.parquet")):
             ruta = patron.replace("'", "''")
-            con.execute(
-                f"CREATE VIEW {tipo} AS SELECT * FROM read_parquet('{ruta}', "
-                "hive_partitioning=true, hive_types={'fuente': VARCHAR, 'simbolo': VARCHAR, "
-                "'anio': BIGINT})")
+            origen = (f"read_parquet('{ruta}', hive_partitioning=true, "
+                      "hive_types={'fuente': VARCHAR, 'simbolo': VARCHAR, 'anio': BIGINT})")
         else:
             con.register(f"_{tipo}_vacia", _vacia(esquema))
-            con.execute(f"CREATE VIEW {tipo} AS SELECT * FROM _{tipo}_vacia")
+            origen = f"_{tipo}_vacia"
+        con.execute(f"CREATE VIEW {tipo} AS SELECT * FROM {origen}{filtros[tipo]}")
     return con
 
 
@@ -224,6 +235,15 @@ def _velas(m1: pd.DataFrame, tf: str, corte_diario: str) -> pd.DataFrame:
 
 # --- API --------------------------------------------------------------------
 
+def _rango(desde: Fecha, hasta: Fecha) -> tuple[datetime, datetime]:
+    """Pasa el rango a UTC y exige que `desde` sea anterior a `hasta`."""
+    d, h = _utc(desde), _utc(hasta)
+    if d >= h:
+        raise ValueError(f"Rango vacío o al revés: desde ({d.isoformat()}) debe ser "
+                         f"anterior a hasta ({h.isoformat()}).")
+    return d, h
+
+
 def _validar_tf(tf: str, corte_diario: str) -> None:
     if tf not in TEMPORALIDADES:
         raise ValueError(f"Temporalidad desconocida: {tf!r}. Opciones: {', '.join(TEMPORALIDADES)}")
@@ -234,27 +254,24 @@ def _validar_tf(tf: str, corte_diario: str) -> None:
 def cargar(simbolo: str, desde: Fecha, hasta: Fecha, tf: str = "m1",
            fuente: str = "dukascopy", incluir_reservado: bool = False,
            corte_diario: Literal["ny", "utc"] = "ny", cfg: Config | None = None) -> pd.DataFrame:
-    """Velas con `ts` (apertura) en [desde, hasta) y su `ts_cierre`.
+    """Velas completas: `ts` (apertura) >= desde y `ts_cierre` <= hasta.
 
-    Sin `incluir_reservado`, solo salen velas que cierran antes del corte de la reserva.
+    Una vela que aún no ha cerrado en `hasta` no sale (sería ver el futuro). Sin
+    `incluir_reservado`, tampoco salen velas que cierran después del corte de la reserva.
     """
     _validar_tf(tf, corte_diario)
+    d, h = _rango(desde, hasta)
     cfg = cfg or cargar_config()
-    d, h = _utc(desde), _utc(hasta)
     corte = _aplicar_reserva(cfg, simbolo, d, h, incluir_reservado)
 
-    # Para cerrar la última vela del rango hace falta leer un poco después de `hasta`.
-    minutos = TEMPORALIDADES[tf]
-    extra = timedelta(days=2) if minutos is None else timedelta(minutes=minutos)
-    limite = h + extra if corte is None else min(h + extra, corte)
+    # Nunca se lee nada posterior a `hasta` (ni al corte de la reserva).
+    limite = h if corte is None else min(h, corte)
     m1 = _leer(cfg.data_dir, "m1", fuente, simbolo, d, limite)
     if m1.empty:
         return _velas(m1, "m1", corte_diario).iloc[0:0].reset_index(drop=True)
 
     velas = _velas(m1, tf, corte_diario)
-    dentro = (velas["ts"] >= pd.Timestamp(d)) & (velas["ts"] < pd.Timestamp(h))
-    if corte is not None:
-        dentro &= velas["ts_cierre"] <= pd.Timestamp(corte)
+    dentro = (velas["ts"] >= pd.Timestamp(d)) & (velas["ts_cierre"] <= pd.Timestamp(limite))
     return velas[dentro].reset_index(drop=True)
 
 
@@ -268,8 +285,8 @@ def _leer_ticks_sin_registro(cfg: Config, simbolo: str, desde: Fecha, hasta: Fec
 def ticks(simbolo: str, desde: Fecha, hasta: Fecha, fuente: str = "dukascopy",
           incluir_reservado: bool = False, cfg: Config | None = None) -> pd.DataFrame:
     """Ticks con `ts` en [desde, hasta), respetando la reserva."""
+    d, h = _rango(desde, hasta)
     cfg = cfg or cargar_config()
-    d, h = _utc(desde), _utc(hasta)
     corte = _aplicar_reserva(cfg, simbolo, d, h, incluir_reservado)
     if corte is not None:
         h = min(h, corte)

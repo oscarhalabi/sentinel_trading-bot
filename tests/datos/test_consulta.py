@@ -230,3 +230,92 @@ def test_consulta_no_necesita_postgres(tmp_path, monkeypatch):
     assert cfg.pg_dsn == ""
     _guardar_m1(tmp_path, m1_sintetica(_t(2024, 3, 4, 10), 10))
     assert len(cargar("XAUUSD", date(2024, 3, 4), date(2024, 3, 5), tf="m5", cfg=cfg)) == 2
+
+
+# --- correcciones de la revisión final ---
+
+def test_h1_con_hasta_a_mitad_de_vela_no_la_devuelve(tmp_path):
+    precios = [float(i) for i in range(1, 121)]
+    _guardar_m1(tmp_path, _m1_con_precios(_t(2024, 3, 4, 10), precios))
+    cfg = _cfg(tmp_path)
+    df = cargar("XAUUSD", date(2024, 3, 4), _t(2024, 3, 4, 10, 30), tf="h1", cfg=cfg)
+    assert df.empty  # la vela de las 10:00 aún no ha cerrado a las 10:30
+    df = cargar("XAUUSD", date(2024, 3, 4), _t(2024, 3, 4, 11), tf="h1", cfg=cfg)
+    assert list(df["ts"]) == [pd.Timestamp(_t(2024, 3, 4, 10))]
+    assert list(df["close"]) == [60.0]  # el close de las 10:59, nada posterior
+    assert (df["ts_cierre"] <= pd.Timestamp(_t(2024, 3, 4, 11))).all()
+
+
+def test_d1_ny_con_hasta_a_mitad_de_vela_no_la_devuelve(tmp_path):
+    inicio = _t(2024, 3, 4)
+    _guardar_m1(tmp_path, m1_sintetica(inicio, 3 * 24 * 60))
+    cfg = _cfg(tmp_path)
+    # En marzo antes del cambio de hora (EST) el día abre a las 22:00 UTC.
+    vela = pd.Timestamp(_t(2024, 3, 4, 22))
+    cierre = _t(2024, 3, 5, 22)
+    df = cargar("XAUUSD", date(2024, 3, 4), _t(2024, 3, 5, 12), tf="d1", cfg=cfg)
+    assert vela not in list(df["ts"])
+    assert (df["ts_cierre"] <= pd.Timestamp(_t(2024, 3, 5, 12))).all()
+    # Con `hasta` a medianoche, la vela que abrió a las 22:00 de la víspera (cierra 22 h
+    # después) no sale.
+    df = cargar("XAUUSD", date(2024, 3, 4), _t(2024, 3, 6), tf="d1", cfg=cfg)
+    assert list(df["ts"]) == [vela]
+    df = cargar("XAUUSD", date(2024, 3, 4), cierre, tf="d1", cfg=cfg)
+    fila = df[df["ts"] == vela]
+    assert len(fila) == 1 and fila.iloc[0]["ts_cierre"] == pd.Timestamp(cierre)
+    assert fila.iloc[0]["ticks"] == 24 * 60 * 10
+
+
+def test_cargar_varios_respeta_hasta_a_mitad_de_vela(tmp_path):
+    _guardar_m1(tmp_path, m1_sintetica(_t(2024, 3, 4, 10), 120), "AAA")
+    _guardar_m1(tmp_path, m1_sintetica(_t(2024, 3, 4, 10), 120), "BBB")
+    df = cargar_varios(["AAA", "BBB"], date(2024, 3, 4), _t(2024, 3, 4, 11, 30), tf="h1",
+                       rellenar="ultimo_conocido", cfg=_cfg(tmp_path))
+    assert len(df) == 2 and (df["ts_cierre"] == pd.Timestamp(_t(2024, 3, 4, 11))).all()
+
+
+def test_rango_al_reves_o_vacio_da_error_antes_que_la_reserva(tmp_path):
+    cfg = _cfg(tmp_path, "2025-01-01")
+    for desde, hasta in ((date(2024, 3, 5), date(2024, 3, 5)),
+                         (date(2025, 6, 1), date(2025, 2, 1))):  # este cae en la reserva
+        with pytest.raises(ValueError, match="desde"):
+            cargar("XAUUSD", desde, hasta, cfg=cfg)
+        with pytest.raises(ValueError, match="desde"):
+            ticks("XAUUSD", desde, hasta, cfg=cfg)
+        with pytest.raises(ValueError, match="desde"):
+            cargar("XAUUSD", desde, hasta, incluir_reservado=True, cfg=cfg)
+    assert not (tmp_path / "_registro").exists()
+
+
+def test_conectar_respeta_la_reserva(tmp_path):
+    cfg = _cfg(tmp_path, "2025-01-01")
+    _guardar_m1(tmp_path, m1_sintetica(_t(2024, 12, 31, 22), 4 * 60))
+    for dia in (date(2024, 12, 31), date(2025, 1, 1)):
+        escribir(tmp_path, ticks_sinteticos(datetime(dia.year, dia.month, dia.day, 10), 20),
+                 "ticks", "dukascopy", "XAUUSD", dia)
+    con = consulta.conectar(cfg)
+    try:
+        assert con.execute("select count(*) from m1").fetchone()[0] == 120
+        ultimo = con.execute("select strftime(max(ts), '%Y-%m-%d %H:%M') from m1").fetchone()[0]
+        assert ultimo == "2024-12-31 23:59"  # cierra justo en el corte
+        assert con.execute("select count(*) from ticks").fetchone()[0] == 20
+    finally:
+        con.close()
+    assert not (tmp_path / "_registro").exists()  # sin reserva no hay registro
+
+
+def test_conectar_con_reserva_ve_todo_y_queda_registrado(tmp_path):
+    cfg = _cfg(tmp_path, "2025-01-01")
+    _guardar_m1(tmp_path, m1_sintetica(_t(2024, 12, 31, 22), 4 * 60))
+    con = consulta.conectar(cfg, incluir_reservado=True)
+    try:
+        assert con.execute("select count(*) from m1").fetchone()[0] == 240
+        assert con.execute("select count(*) from ticks").fetchone()[0] == 0
+    finally:
+        con.close()
+    lineas = (tmp_path / "_registro" / "reserva.jsonl").read_text(encoding="utf-8").splitlines()
+    assert len(lineas) == 1
+    linea = json.loads(lineas[0])
+    assert linea["simbolo"] == "*"
+    assert datetime.fromisoformat(linea["desde"]) == datetime.min.replace(tzinfo=timezone.utc)
+    assert datetime.fromisoformat(linea["hasta"]) == datetime.max.replace(tzinfo=timezone.utc)
