@@ -76,7 +76,15 @@ Rama `fase2/datos-historicos`, PR oscarhalabi/sentinel_trading-bot#3.
   límites para `datafeed`: describe una exportación por **AWS S3 con "Requester Pays"** (bucket
   `cfg-public-proper-wallaby`, eu-west-1), donde quien descarga paga el tráfico. Falta saber si el
   bloqueo lo provocó nuestra primera ráfaga (4 en paralelo × 24 horas, con reintentos) o si ahora
-  limitan a todo el mundo. Hasta que Oscar decida cómo seguir, no se baja nada.
+  limitan a todo el mundo.
+- **Despacio sí funciona** (decisión de Oscar, 2026-11-12: "probar más despacio"). Unas horas después,
+  con `DUKAS_MAX_PARALELO=1` y `DUKAS_MAX_POR_SEGUNDO=1`, XAUUSD del 2024-05-13 bajó en 55 s
+  (181.910 ticks, Parquet de 1,6 MB, precios de 2.332 a 2.364, spread medio de 0,35). Con
+  `2` y `2`, el 2024-05-14 bajó en 30 s (218.729 ticks), sin errores. Cada petición tarda ~2 s en
+  ida y vuelta: con poco paralelismo, el límite es esa espera.
+- **Lo que tardaría la prioridad 1** (38 símbolos desde el inicio de cada uno): ~200.000 días, unos
+  69 días de reloj a 30 s/día. XAUUSD solo (desde 2003-05-05, 8.591 días) son unos 3 días.
+  Todavía no se ha probado si 4 en paralelo sin ráfagas vuelve a provocar el bloqueo.
 
 ## Pendientes
 
