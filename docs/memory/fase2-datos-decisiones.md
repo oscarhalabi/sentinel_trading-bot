@@ -39,9 +39,33 @@ Rama `fase2/datos-historicos`, PR oscarhalabi/sentinel_trading-bot#3.
 - **R2:** en la cuenta de Cloudflare de Oscar, con dos buckets (`sentinel-datos` y
   `sentinel-datos-vps`), porque las claves de R2 se limitan por bucket.
 
+## Estado de 2A (2026-11-12)
+
+- Código de 2A hecho en la rama `datos/base-almacen` (tareas 1–10 del plan, por subagentes con revisión por
+  tarea y revisión final). Tests de `datos/`: 168 pasan con Postgres de prueba (155 + 13 omitidos sin él).
+- **Falta la Task 11 en la laptop**: formato real de la lista de instrumentos de Dukascopy (el parser es
+  provisional), primera descarga real, comparar un día de oro con un gráfico, prioridad 1 completa,
+  `verificar`, medir velocidad y tamaños, `catalogo reconstruir`, docs `docs/datos-de-mercado.md`,
+  skill `datos-mercado` y la línea de `datos/` en CLAUDE.md. Ahí se corre también la suite completa (Windows).
+- Decisiones tomadas al implementar (Rulings del ledger de ejecución):
+  - `bajar` decide qué falta mirando siempre los archivos y manifiestos; el catálogo solo se escribe.
+  - La consulta nunca devuelve una vela con `ts_cierre` posterior a `hasta`, y `conectar()` también respeta
+    la reserva (con `incluir_reservado=True` queda registrado).
+  - `hasta` por defecto en `bajar` = hoy UTC − 2 días (Dukascopy puede tardar en publicar).
+  - La comprobación de escala atrapa decimales muy mal puestos (×1000), no un ×100 dentro de la clase: eso
+    se revisa con `descubrir` (decimales oficiales) y el gráfico de referencia.
+  - Se corta un símbolo tras 10 días seguidos con error, o si llega a 8 semanas vacías sin ningún día bueno
+    ("¿código de fuente mal puesto?"). Parar por disco bajo sale con código 1.
+  - Un símbolo que reaparece en Dukascopy vuelve a activo salvo que `activo` esté en `ajustado_a_mano`.
+  - `verificar` marca como hueco grave un día laborable vacío posterior al primer día bueno del símbolo, y
+    normaliza el conteo de ticks por hora abierta (los domingos no dan falsas alarmas).
+- Pendientes menores anotados: `verificar` con comprobación de hash; una línea cortada de
+  `_registro/reserva.jsonl` hace fallar `verificar`/`catalogo estado`; huecos que cruzan medianoche se
+  parten en dos; posibles colisiones de nombre canónico (revisar con la lista real).
+
 ## Pendientes
 
-1. Oscar revisa la spec de 2A; después, plan de 2A con superpowers:writing-plans.
+1. ~~Spec y plan de 2A~~ (PR #3 mergeado). Código de 2A en `datos/base-almacen`; falta la Task 11 en la laptop.
 2. Claves de R2 y FRED en el `.env` de la laptop (se usan en 2B y 2C, no en 2A).
 3. El PR #3 lo abrió Claude cuando Oscar reconectó GitHub (antes daba 403). La rama
    `claude/fase2-historical-data-xau-rp4wa5` no se pudo borrar desde la sesión: hay que borrarla en GitHub.
