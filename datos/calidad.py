@@ -189,16 +189,37 @@ def chequear_split(cierres: pd.DataFrame, simbolo: str,
 
 # --- verificación completa --------------------------------------------------
 
-def _dias_ok(cfg: Config, simbolo: str, fuente: str, desde: date | None):
-    ms = [m for m in listar_manifiestos(cfg.data_dir, "ticks", fuente, simbolo)
-          if m.estado == "ok"]
-    dias = [(date.fromisoformat(m.periodo), m) for m in ms]
-    return sorted((d, m) for d, m in dias if desde is None or d >= desde)
+def _dias(cfg: Config, simbolo: str, fuente: str):
+    """(días ok, días vacíos) de ticks del símbolo, ordenados: [(día, manifiesto)]."""
+    ok, vacios = [], []
+    for m in listar_manifiestos(cfg.data_dir, "ticks", fuente, simbolo):
+        (ok if m.estado == "ok" else vacios).append((date.fromisoformat(m.periodo), m))
+    return sorted(ok, key=lambda x: x[0]), sorted(vacios, key=lambda x: x[0])
+
+
+def chequear_dias_vacios(dias_vacios: list[date], sim, fuente: str = "dukascopy",
+                         primer_ok: date | None = None) -> list[Problema]:
+    """Día `vacio` con horas abiertas en la plantilla = hueco grave (p. ej., caída de la
+    fuente). Solo cuentan los días posteriores al primer día ok: los vacíos de antes son
+    el tramo anterior al inicio del símbolo, donde la descarga se paró."""
+    salida = []
+    for d in dias_vacios:
+        if primer_ok is None or d <= primer_ok:
+            continue
+        horas = _horas_abiertas(sim, d)
+        if horas:
+            inicio = _inicio_dia(d)
+            salida.append(Problema(
+                "hueco", sim.simbolo, fuente, inicio + timedelta(hours=horas[0]),
+                inicio + timedelta(hours=horas[-1] + 1), "grave",
+                {"motivo": "dia_vacio_en_horario_abierto"}))
+    return salida
 
 
 def verificar(cfg: Config, simbolos, catalogo, desde: date | None = None) -> list[Problema]:
-    """Revisa los días ok de cada símbolo. Devuelve los problemas NUEVOS: los que el
-    catálogo no tenía ya (sin catálogo, todos cuentan como nuevos)."""
+    """Revisa los días ok de cada símbolo y los días vacíos que deberían tener datos.
+    Devuelve los problemas NUEVOS: los que el catálogo no tenía ya (sin catálogo, todos
+    cuentan como nuevos)."""
     nuevos: list[Problema] = []
 
     def _anotar(problemas: list[Problema]) -> None:
@@ -209,7 +230,12 @@ def verificar(cfg: Config, simbolos, catalogo, desde: date | None = None) -> lis
 
     for sim in simbolos:
         for fuente in sim.fuentes:
-            dias = _dias_ok(cfg, sim.simbolo, fuente, desde)
+            todos_ok, todos_vacios = _dias(cfg, sim.simbolo, fuente)
+            primer_ok = todos_ok[0][0] if todos_ok else None
+            _anotar(chequear_dias_vacios([d for d, _m in todos_vacios
+                                          if desde is None or d >= desde],
+                                         sim, fuente, primer_ok))
+            dias = [(d, m) for d, m in todos_ok if desde is None or d >= desde]
             if not dias:
                 continue
             _anotar(chequear_conteo({d: m.filas for d, m in dias}, sim.simbolo, fuente, sim))

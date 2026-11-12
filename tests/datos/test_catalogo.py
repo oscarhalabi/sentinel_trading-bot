@@ -122,7 +122,9 @@ def test_accesos_reserva_idempotente(cat, tmp_path):
     assert cat.importar_accesos_reserva(tmp_path) == 0  # sin archivo
     linea = {"momento": "2026-11-12T10:00:00+00:00", "quien": "oscar", "simbolo": "XAUUSD",
              "desde": "2025-11-12T00:00:00+00:00", "hasta": "2025-12-12T00:00:00+00:00"}
-    (tmp_path / "reserva.jsonl").write_text(json.dumps(linea) + "\n", encoding="utf-8")
+    (tmp_path / "_registro").mkdir()
+    (tmp_path / "_registro" / "reserva.jsonl").write_text(json.dumps(linea) + "\n",
+                                                          encoding="utf-8")
     assert cat.importar_accesos_reserva(tmp_path) == 1
     assert cat.importar_accesos_reserva(tmp_path) == 0
     assert len(_filas(cat, "select 1 from accesos_reserva")) == 1
@@ -146,3 +148,57 @@ def test_cli_catalogo_sin_dsn_da_error_claro(capsys):
     cfg = Config(data_dir=None, pg_dsn="", disco_min_gb=50, corte_reserva=None)
     assert _catalogo("estado", cfg) == 1
     assert "DATOS_PG_DSN" in capsys.readouterr().err
+
+
+# --- correcciones de la revisión final (base real) ---
+
+def _cfg_real(tmp_path):
+    from datos.config import Config
+    return Config(data_dir=tmp_path, pg_dsn=DSN_TEST, disco_min_gb=0, corte_reserva=None)
+
+
+def _acceso_desde_consulta(tmp_path):
+    """Escribe una línea de reserva como lo hace de verdad la consulta."""
+    from datos import consulta
+    d = datetime(2025, 12, 1, tzinfo=timezone.utc)
+    consulta._registrar_acceso(_cfg_real(tmp_path), "XAUUSD", d, d + timedelta(days=30))
+
+
+@base_real
+def test_importa_la_reserva_que_escribe_la_consulta(cat, tmp_path):
+    _acceso_desde_consulta(tmp_path)
+    assert cat.importar_accesos_reserva(tmp_path) == 1
+    assert _filas(cat, "select simbolo from accesos_reserva") == [("XAUUSD",)]
+
+
+@base_real
+@pytest.mark.parametrize("accion", ["reconstruir", "estado"])
+def test_cli_catalogo_importa_accesos_reserva(cat, tmp_path, accion, capsys):
+    from datos.__main__ import main
+    _acceso_desde_consulta(tmp_path)
+    assert main(["catalogo", accion], config=_cfg_real(tmp_path)) == 0
+    assert len(_filas(cat, "select 1 from accesos_reserva")) == 1
+    assert "postgresql://" not in capsys.readouterr().out
+
+
+@base_real
+def test_cli_verificar_importa_accesos_reserva(cat, tmp_path):
+    from datos.__main__ import main
+    from datos.simbolos import Simbolo, guardar
+    ruta = tmp_path / "reg.json"
+    guardar({"XAUUSD": Simbolo("XAUUSD", "metal", 1, {"dukascopy": "XAUUSD"}, 3, "metal",
+                               "USD")}, ruta)
+    _acceso_desde_consulta(tmp_path)
+    assert main(["verificar"], ruta=ruta, config=_cfg_real(tmp_path)) == 0
+    assert len(_filas(cat, "select 1 from accesos_reserva")) == 1
+
+
+@base_real
+def test_reconstruir_inicio_solo_cuenta_ticks(cat, tmp_path):
+    from tests.datos.ayudas import m1_sintetica
+    _escribir_dia(tmp_path, date(2024, 3, 5))
+    escribir(tmp_path, m1_sintetica(datetime(2024, 2, 20, tzinfo=timezone.utc), 5), "m1",
+             "dukascopy", "XAUUSD", date(2024, 2, 1))  # mes que empieza antes de los ticks
+    assert cat.reconstruir(tmp_path) == 2
+    assert _filas(cat, "select simbolo, fuente, inicio from inicios") == \
+        [("XAUUSD", "dukascopy", date(2024, 3, 5))]

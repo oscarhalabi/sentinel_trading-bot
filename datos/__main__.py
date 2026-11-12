@@ -192,6 +192,8 @@ def _verificar(args, ruta, config) -> int:
                   "No se verifica nada.", file=sys.stderr)
             return 1
     try:
+        if cat:
+            cat.importar_accesos_reserva(cfg.data_dir)
         problemas = verificar(cfg, elegidos, cat, desde=args.desde)
         resumen = {"faltantes": _faltantes(cat, elegidos)} if cat else None
     finally:
@@ -228,7 +230,9 @@ def _catalogo(accion: str, config=None) -> int:
             print("Migraciones aplicadas:", ", ".join(hechas) if hechas else "ninguna (al día)")
         elif accion == "reconstruir":
             print(f"Catálogo reconstruido: {cat.reconstruir(cfg.data_dir)} particiones.")
+            print(f"Accesos a la reserva importados: {cat.importar_accesos_reserva(cfg.data_dir)}")
         else:
+            cat.importar_accesos_reserva(cfg.data_dir)
             filas = cat.resumen_estado()
             if not filas:
                 print("El catálogo está vacío.")
@@ -261,7 +265,7 @@ def main(argv: list[str] | None = None, fuente=None, ruta=None, config=None) -> 
         if getattr(args, "accion", None) is None:
             print("Falta la acción: migrar, reconstruir o estado.", file=sys.stderr)
             return 2
-        return _catalogo(args.accion)
+        return _catalogo(args.accion, config)
     print("Falta indicar la acción de la orden (usa --help).", file=sys.stderr)
     return 2
 

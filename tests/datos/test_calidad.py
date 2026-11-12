@@ -262,3 +262,33 @@ def test_cli_verificar_exit_1_con_grave(tmp_path, capsys):
     assert "_informes" in capsys.readouterr().out
     _guardar_dia(tmp_path, dia, _cada_minuto(dia))
     assert main(["verificar"], ruta=ruta, config=_cfg(tmp_path)) == 0
+
+
+def test_dia_vacio_en_horario_abierto_es_hueco_grave(tmp_path):
+    from datos.almacen import marcar_vacio
+    from datos.calidad import _horas_abiertas
+    lunes, martes, sabado = date(2024, 5, 13), date(2024, 5, 14), date(2024, 5, 18)
+    viernes_antes = date(2024, 5, 10)  # antes del primer día ok: tramo previo al inicio
+    _guardar_dia(tmp_path, lunes, _cada_minuto(lunes))
+    _guardar_dia(tmp_path, date(2024, 5, 20), _cada_minuto(date(2024, 5, 20)))
+    for d in (viernes_antes, martes, sabado):
+        marcar_vacio(tmp_path, "ticks", "dukascopy", "XAUUSD", d)
+    r = verificar(_cfg(tmp_path), [_sim()], None)
+    vacios = [p for p in r if p.detalle.get("motivo") == "dia_vacio_en_horario_abierto"]
+    assert len(vacios) == 1
+    p = vacios[0]
+    horas = _horas_abiertas(_sim(), martes)
+    assert p.tipo == "hueco" and p.gravedad == "grave"
+    assert p.desde == _t(2024, 5, 14, horas[0]) and p.hasta == _t(2024, 5, 14) + \
+        timedelta(hours=horas[-1] + 1)
+    assert p.detalle == {"motivo": "dia_vacio_en_horario_abierto"}
+    # `desde` también recorta los días vacíos.
+    assert not [p for p in verificar(_cfg(tmp_path), [_sim()], None, desde=date(2024, 5, 15))
+                if p.detalle.get("motivo")]
+
+
+def test_sabado_vacio_no_es_problema(tmp_path):
+    from datos.almacen import marcar_vacio
+    _guardar_dia(tmp_path, date(2024, 5, 13), _cada_minuto(date(2024, 5, 13)))
+    marcar_vacio(tmp_path, "ticks", "dukascopy", "XAUUSD", date(2024, 5, 18))
+    assert verificar(_cfg(tmp_path), [_sim()], None) == []

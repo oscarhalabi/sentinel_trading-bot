@@ -11,7 +11,8 @@ import json
 import os
 import shutil
 import subprocess
-from dataclasses import asdict, dataclass, field
+import warnings
+from dataclasses import asdict, dataclass, field, fields
 from datetime import date, datetime, timezone
 from functools import lru_cache
 from pathlib import Path, PurePosixPath
@@ -57,6 +58,10 @@ class EsquemaInvalido(ValueError):
     """La tabla no cumple el esquema esperado."""
 
 
+class ManifiestoIlegible(UserWarning):
+    """Aviso: un manifiesto no se pudo leer y se trata como si no existiera."""
+
+
 @dataclass
 class Manifiesto:
     ruta: str
@@ -81,7 +86,10 @@ class Manifiesto:
 
     @classmethod
     def from_json(cls, texto: str) -> "Manifiesto":
-        return cls(**json.loads(texto))
+        """Lee un manifiesto. Las claves que no conoce se ignoran (versiones futuras)."""
+        datos = json.loads(texto)
+        conocidas = {f.name for f in fields(cls)}
+        return cls(**{k: v for k, v in datos.items() if k in conocidas})
 
 
 # --- rutas -----------------------------------------------------------------
@@ -149,10 +157,13 @@ def _validar(tabla: pa.Table, tipo: str) -> None:
 def _escribir_atomico(destino: Path, contenido: bytes | None = None, tabla: pa.Table | None = None) -> None:
     destino.parent.mkdir(parents=True, exist_ok=True)
     tmp = destino.with_name(destino.name + ".tmp")
-    if tabla is not None:
-        pq.write_table(tabla, tmp, compression="zstd")
-    else:
-        tmp.write_bytes(contenido or b"")
+    with open(tmp, "wb") as f:
+        if tabla is not None:
+            pq.write_table(tabla, f, compression="zstd")
+        else:
+            f.write(contenido or b"")
+        f.flush()
+        os.fsync(f.fileno())  # que esté en disco antes de renombrar (corte de luz)
     os.replace(tmp, destino)
 
 
@@ -162,11 +173,22 @@ def _guardar_manifiesto(raiz: Path, m: Manifiesto) -> None:
 
 # --- API -------------------------------------------------------------------
 
+def _leer_archivo_manifiesto(p: Path) -> Manifiesto | None:
+    """Lee un manifiesto; si está roto (JSON cortado, faltan claves) avisa y da None."""
+    try:
+        return Manifiesto.from_json(p.read_text(encoding="utf-8"))
+    except (ValueError, TypeError, AttributeError) as e:
+        warnings.warn(f"Manifiesto ilegible, se trata como ausente: {p} ({type(e).__name__})",
+                      ManifiestoIlegible, stacklevel=3)
+        return None
+
+
 def leer_manifiesto(raiz: Path, ruta_rel: str) -> Manifiesto | None:
+    """El manifiesto de esa ruta, o None si no existe o no se puede leer."""
     p = _ruta_manifiesto(raiz, ruta_rel)
     if not p.is_file():
         return None
-    return Manifiesto.from_json(p.read_text(encoding="utf-8"))
+    return _leer_archivo_manifiesto(p)
 
 
 def escribir(raiz: Path, tabla: pa.Table, tipo: Tipo, fuente: str, simbolo: str,
@@ -236,7 +258,8 @@ def estado(raiz: Path, tipo: Tipo, fuente: str, simbolo: str, periodo: date,
 
 def listar_manifiestos(raiz: Path, tipo: str | None = None, fuente: str | None = None,
                        simbolo: str | None = None) -> Iterator[Manifiesto]:
-    """Manifiestos guardados. `fuente` y `simbolo` (con `tipo`) recortan la carpeta que se lee."""
+    """Manifiestos guardados. `fuente` y `simbolo` (con `tipo`) recortan la carpeta que se lee.
+    Los manifiestos ilegibles se saltan con un aviso."""
     base = Path(raiz) / CARPETA_MANIFIESTOS / (tipo or "")
     if tipo and fuente:
         base = base / f"fuente={fuente}"
@@ -245,7 +268,9 @@ def listar_manifiestos(raiz: Path, tipo: str | None = None, fuente: str | None =
     if not base.is_dir():
         return
     for p in sorted(base.rglob("*.json")):
-        yield Manifiesto.from_json(p.read_text(encoding="utf-8"))
+        m = _leer_archivo_manifiesto(p)
+        if m is not None:
+            yield m
 
 
 def espacio_libre_gb(raiz: Path) -> float:

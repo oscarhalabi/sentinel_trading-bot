@@ -18,7 +18,7 @@ from datos.almacen import Manifiesto, listar_manifiestos
 from scripts.localdb_migrate import apply_pending
 
 MIGRACIONES = Path(__file__).resolve().parent / "migrations"
-RESERVA_JSONL = "reserva.jsonl"
+RESERVA_JSONL = Path("_registro") / "reserva.jsonl"  # lo escribe datos.consulta
 
 
 def dias_pendientes(hechos: Mapping[date, str], desde: date, hasta: date) -> list[date]:
@@ -144,7 +144,7 @@ class Catalogo:
 
     # --- reserva ---
     def importar_accesos_reserva(self, raiz: Path) -> int:
-        """Importa `reserva.jsonl` (idempotente). Devuelve cuántas filas nuevas entraron."""
+        """Importa `raiz/_registro/reserva.jsonl` (idempotente). Devuelve las filas nuevas."""
         ruta = Path(raiz) / RESERVA_JSONL
         if not ruta.is_file():
             return 0
@@ -171,11 +171,12 @@ class Catalogo:
             for m in listar_manifiestos(raiz):
                 cur.execute(self._UPSERT, self._valores(m))
                 n += 1
+            # El inicio de un símbolo es su primer día de ticks ok (la M1 es mensual y
+            # empezaría el día 1 del mes, antes del dato real).
             cur.execute(
                 "insert into inicios (simbolo, fuente, inicio) "
-                "select simbolo, fuente, min(to_date(periodo || case when length(periodo)=7 "
-                "then '-01' else '' end, 'YYYY-MM-DD')) from particiones "
-                "where estado='ok' group by simbolo, fuente")
+                "select simbolo, fuente, min(to_date(periodo, 'YYYY-MM-DD')) from particiones "
+                "where estado='ok' and tipo='ticks' group by simbolo, fuente")
         return n
 
     # --- resumen ---

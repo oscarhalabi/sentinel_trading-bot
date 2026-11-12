@@ -133,3 +133,53 @@ def test_listar_manifiestos(tmp_path):
 
 def test_espacio_libre(tmp_path):
     assert espacio_libre_gb(tmp_path) > 0
+
+
+# --- correcciones de la revisión final ---
+
+def test_manifiesto_truncado_es_incompleto_y_listar_no_revienta(tmp_path):
+    from datos.almacen import ManifiestoIlegible, _ruta_manifiesto
+    escribir(tmp_path, ticks_sinteticos(INICIO, 5), *ARGS)
+    otro = ("ticks", "dukascopy", "XAUUSD", date(2024, 3, 6))
+    escribir(tmp_path, ticks_sinteticos(INICIO, 5), *otro)
+    p = _ruta_manifiesto(tmp_path, ruta_relativa(*ARGS))
+    p.write_text(p.read_text(encoding="utf-8")[:40], encoding="utf-8")  # JSON cortado
+    with pytest.warns(ManifiestoIlegible, match="ilegible"):
+        assert estado(tmp_path, *ARGS) == "incompleto"
+    with pytest.warns(ManifiestoIlegible):
+        assert [m.periodo for m in listar_manifiestos(tmp_path)] == ["2024-03-06"]
+    with pytest.warns(ManifiestoIlegible):
+        assert leer_manifiesto(tmp_path, str(ruta_relativa(*ARGS))) is None
+    # Sin Parquet, un manifiesto ilegible cuenta como que falta.
+    (tmp_path / ruta_relativa(*ARGS)).unlink()
+    with pytest.warns(ManifiestoIlegible):
+        assert estado(tmp_path, *ARGS) == "falta"
+    # Y se puede reescribir encima sin problema.
+    with pytest.warns(ManifiestoIlegible):
+        escribir(tmp_path, ticks_sinteticos(INICIO, 5), *ARGS)
+    assert estado(tmp_path, *ARGS) == "ok"
+
+
+def test_manifiesto_con_clave_desconocida_se_lee(tmp_path):
+    from datos.almacen import _ruta_manifiesto
+    escribir(tmp_path, ticks_sinteticos(INICIO, 5), *ARGS)
+    p = _ruta_manifiesto(tmp_path, ruta_relativa(*ARGS))
+    datos = json.loads(p.read_text(encoding="utf-8"))
+    datos["campo_del_futuro"] = 123
+    p.write_text(json.dumps(datos), encoding="utf-8")
+    assert leer_manifiesto(tmp_path, str(ruta_relativa(*ARGS))).filas == 5
+    assert estado(tmp_path, *ARGS) == "ok"
+    assert len(list(listar_manifiestos(tmp_path))) == 1
+
+
+def test_fsync_antes_de_renombrar(tmp_path, monkeypatch):
+    from datos import almacen
+    eventos = []
+    fsync_real, replace_real = almacen.os.fsync, almacen.os.replace
+    monkeypatch.setattr(almacen.os, "fsync", lambda fd: (eventos.append("fsync"), fsync_real(fd)))
+    monkeypatch.setattr(almacen.os, "replace",
+                        lambda a, b: (eventos.append("replace"), replace_real(a, b)))
+    escribir(tmp_path, ticks_sinteticos(INICIO, 5), *ARGS)  # Parquet y manifiesto
+    marcar_vacio(tmp_path, "ticks", "dukascopy", "XAUUSD", date(2024, 3, 6))  # manifiesto
+    assert eventos == ["fsync", "replace"] * 3
+    assert estado(tmp_path, *ARGS) == "ok"
