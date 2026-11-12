@@ -78,18 +78,25 @@ def chequear_coherencia(tabla: pd.DataFrame, simbolo: str,
                      "grave", {"motivos": motivos})]
 
 
+def _horas_abiertas(sim, dia: date) -> list[int]:
+    """Horas UTC del día esperadas como abiertas (abierto al inicio y a mitad de hora)."""
+    inicio = _inicio_dia(dia)
+    return [h for h in range(24)
+            if abierto(sim.horario, inicio + timedelta(hours=h))
+            and abierto(sim.horario, inicio + timedelta(hours=h, minutes=30))]
+
+
 def chequear_huecos(tabla: pd.DataFrame, sim, dia: date,
                     fuente: str = "dukascopy") -> list[Problema]:
     """Horas UTC abiertas (al inicio y a mitad de hora) sin ningún tick."""
     inicio = _inicio_dia(dia)
+    abiertas = set(_horas_abiertas(sim, dia))
     con_ticks = set()
     if not tabla.empty:
         con_ticks = {int(h) for h in tabla["ts"].dt.tz_convert("UTC").dt.hour.unique()}
     vacias = []
     for h in range(24):
-        a = inicio + timedelta(hours=h)
-        if (h not in con_ticks and abierto(sim.horario, a)
-                and abierto(sim.horario, a + timedelta(minutes=30))):
+        if h not in con_ticks and h in abiertas:
             vacias.append(h)
     tramos: list[list[int]] = []
     for h in vacias:
@@ -136,17 +143,28 @@ def chequear_saltos(tabla: pd.DataFrame, simbolo: str,
             for g in grupos]
 
 
-def chequear_conteo(conteos: dict[date, int], simbolo: str,
-                    fuente: str = "dukascopy") -> list[Problema]:
-    """Días con menos del 20 % de la mediana de ticks (hacen falta 5 días)."""
-    if len(conteos) < MIN_DIAS_CONTEO:
+def chequear_conteo(conteos: dict[date, int], simbolo: str, fuente: str = "dukascopy",
+                    sim=None) -> list[Problema]:
+    """Días con menos del 20 % de la mediana de ticks (hacen falta 5 días).
+    Con `sim`, se compara ticks por hora abierta (los días parciales, como el domingo,
+    no se marcan); los días sin horas abiertas se saltan."""
+    if sim is not None:
+        valores = {}
+        for d, n in conteos.items():
+            horas = len(_horas_abiertas(sim, d))
+            if horas:
+                valores[d] = n / horas
+    else:
+        valores = dict(conteos)
+    if len(valores) < MIN_DIAS_CONTEO:
         return []
-    mediana = statistics.median(conteos.values())
+    mediana = statistics.median(valores.values())
     if mediana <= 0:
         return []
     return [Problema("conteo", simbolo, fuente, _inicio_dia(d), _inicio_dia(d) + timedelta(days=1),
-                     "aviso", {"ticks": int(n), "mediana": float(mediana)})
-            for d, n in sorted(conteos.items()) if n < UMBRAL_CONTEO * mediana]
+                     "aviso", {"ticks": int(conteos[d]), "por_hora_abierta": float(v),
+                               "mediana": float(mediana)})
+            for d, v in sorted(valores.items()) if v < UMBRAL_CONTEO * mediana]
 
 
 def chequear_split(cierres: pd.DataFrame, simbolo: str,
@@ -194,7 +212,7 @@ def verificar(cfg: Config, simbolos, catalogo, desde: date | None = None) -> lis
             dias = _dias_ok(cfg, sim.simbolo, fuente, desde)
             if not dias:
                 continue
-            _anotar(chequear_conteo({d: m.filas for d, m in dias}, sim.simbolo, fuente))
+            _anotar(chequear_conteo({d: m.filas for d, m in dias}, sim.simbolo, fuente, sim))
             es_accion = sim.clase in ("accion", "etf")
             cierres: dict[date, dict] = {}
             for d, _m in dias:

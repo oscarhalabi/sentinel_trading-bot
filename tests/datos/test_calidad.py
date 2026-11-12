@@ -148,6 +148,24 @@ def test_dia_con_pocos_ticks():
     assert r[0].desde == _t(2024, 5, 12)
 
 
+def test_domingo_parcial_no_se_marca_por_conteo():
+    # lun-vie 24 h a 1000 ticks por hora abierta; domingo solo 22:00-24:00 UTC (2 h)
+    sim = _sim()
+    conteos = {date(2024, 5, d): 22 * 1000 for d in range(6, 11)}  # 22 h abiertas (pausa 17-18 NY)
+    conteos[date(2024, 5, 12)] = 2 * 1000
+    assert chequear_conteo(conteos, "XAUUSD", "dukascopy", sim) == []
+    # sin normalizar, el domingo sí saltaría
+    assert len(chequear_conteo(conteos, "XAUUSD", "dukascopy")) == 1
+
+
+def test_dia_completo_con_pocos_ticks_se_marca_normalizado():
+    sim = _sim()
+    conteos = {date(2024, 5, d): 22 * 1000 for d in range(6, 11)}
+    conteos[date(2024, 5, 14)] = 500
+    r = chequear_conteo(conteos, "XAUUSD", "dukascopy", sim)
+    assert [p.desde for p in r] == [_t(2024, 5, 14)]
+
+
 def test_conteo_con_pocos_dias_no_juzga():
     assert chequear_conteo({date(2024, 5, 6): 1000, date(2024, 5, 7): 10}, "X", "dukascopy") == []
 
