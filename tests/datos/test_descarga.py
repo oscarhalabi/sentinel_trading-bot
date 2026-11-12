@@ -9,7 +9,7 @@ import pytest
 
 from datos import descarga
 from datos.__main__ import main
-from datos.almacen import estado
+from datos.almacen import escribir, estado
 from datos.config import Config
 from datos.descarga import bajar
 from datos.fuentes.base import ResultadoDia
@@ -17,6 +17,7 @@ from datos.simbolos import Simbolo
 from tests.datos.ayudas import ticks_sinteticos
 
 HOY = date(2026, 11, 12)
+HASTA = HOY - timedelta(days=2)  # último día que se pide por defecto
 
 
 def _sim(nombre="XAUUSD", clase="metal", prioridad=1):
@@ -60,23 +61,23 @@ def cfg(tmp_path):
     return Config(data_dir=tmp_path, pg_dsn="", disco_min_gb=1.0, corte_reserva=None)
 
 
-def _dias(n, hasta=HOY - timedelta(days=1)):
+def _dias(n, hasta=HASTA):
     return [hasta - timedelta(days=i) for i in range(n)]
 
 
 def test_baja_de_hoy_hacia_atras(cfg):
     f = FuenteFalsa({("XAUUSD", d): _ok(d) for d in _dias(5)})
-    r = bajar(cfg, [_sim()], f, None, desde=HOY - timedelta(days=5), hoy=HOY)
+    r = bajar(cfg, [_sim()], f, None, desde=HASTA - timedelta(days=4), hoy=HOY)
     dias = [d for _, d in f.llamadas]
     assert dias == sorted(dias, reverse=True)
-    assert dias[0] == HOY - timedelta(days=1)
+    assert dias[0] == HASTA
     assert r.dias_ok == 5 and r.dias_error == 0
-    assert estado(cfg.data_dir, "ticks", "dukascopy", "XAUUSD", HOY - timedelta(days=1)) == "ok"
+    assert estado(cfg.data_dir, "ticks", "dukascopy", "XAUUSD", HASTA) == "ok"
 
 
 def test_reanuda_sin_duplicar(cfg):
     f = FuenteFalsa({("XAUUSD", d): _ok(d) for d in _dias(3)})
-    desde = HOY - timedelta(days=5)
+    desde = HASTA - timedelta(days=4)
     bajar(cfg, [_sim()], f, None, desde=desde, hoy=HOY)
     n = len(f.llamadas)
     assert n == 5
@@ -115,7 +116,7 @@ def test_para_tras_8_semanas_vacias(cfg):
 
 
 def test_escala_mala_para_el_simbolo(cfg):
-    d = HOY - timedelta(days=1)
+    d = HASTA
     f = FuenteFalsa({("XAUUSD", d): _ok(d, precio=200000.0),  # oro a 200 000: mala escala
                      ("EURUSD", d): _ok(d, precio=1.1)})
     syms = [_sim("XAUUSD"), _sim("EURUSD", clase="fx_mayor")]
@@ -159,7 +160,7 @@ def test_candado_huerfano_se_reemplaza(cfg):
     carpeta.mkdir()
     (carpeta / "descarga.lock").write_text("999999999")
     f = FuenteFalsa()
-    bajar(cfg, [_sim()], f, None, desde=HOY - timedelta(days=1), hoy=HOY)
+    bajar(cfg, [_sim()], f, None, desde=HASTA, hoy=HOY)
     assert f.llamadas
     assert not (carpeta / "descarga.lock").exists()  # se libera al terminar
 
@@ -169,12 +170,12 @@ def test_candado_se_libera_si_hay_excepcion(cfg):
         def bajar_dia(self, sim, dia):
             raise KeyboardInterrupt
     with pytest.raises(KeyboardInterrupt):
-        bajar(cfg, [_sim()], Rompe(), None, desde=HOY - timedelta(days=1), hoy=HOY)
+        bajar(cfg, [_sim()], Rompe(), None, desde=HASTA, hoy=HOY)
     assert not (cfg.data_dir / "_registro" / "descarga.lock").exists()
 
 
 def test_un_simbolo_que_falla_no_para_los_demas(cfg):
-    d = HOY - timedelta(days=1)
+    d = HASTA
     f = FuenteFalsa({("EURUSD", d): _ok(d, precio=1.1)}, falla_simbolos={"XAUUSD"})
     syms = [_sim("XAUUSD"), _sim("EURUSD", clase="fx_mayor")]
     r = bajar(cfg, syms, f, None, desde=d - timedelta(days=1), hoy=HOY)
@@ -288,15 +289,16 @@ class CatalogoFalso:
         self.corridas[id] = (resultado, resumen)
 
 
-def test_con_catalogo_lee_estados_y_registra(cfg):
+def test_con_catalogo_registra_y_decide_por_el_almacen(cfg):
     ok1, ok2, malo = HOY - timedelta(days=10), HOY - timedelta(days=11), HOY - timedelta(days=3)
-    ya_hecho = HOY - timedelta(days=1)
-    cat = CatalogoFalso({ya_hecho: "ok"})
+    ya_hecho = HASTA
+    escribir(cfg.data_dir, _tabla(ya_hecho), "ticks", "dukascopy", "XAUUSD", ya_hecho)
+    cat = CatalogoFalso()  # vacío: no sabe nada de `ya_hecho`
     f = FuenteFalsa({("XAUUSD", ok1): _ok(ok1), ("XAUUSD", ok2): _ok(ok2),
                      ("XAUUSD", malo): ResultadoDia("error", None, "HTTP 503")})
     r = bajar(cfg, [_sim()], f, cat, hoy=HOY)
-    assert cat.consultas == [("ticks", "dukascopy", "XAUUSD")]
-    assert ya_hecho not in [d for _, d in f.llamadas]  # el estado salió del catálogo
+    assert cat.consultas == []  # el estado de los días no sale del catálogo
+    assert ya_hecho not in [d for _, d in f.llamadas]  # salió del almacén
     assert ("2026-11-02", "ok") in cat.registrados and ("2026-11-01", "ok") in cat.registrados
     assert any(e == "vacio" for _, e in cat.registrados)
     assert [p for p, _ in cat.errores] == [malo]
@@ -308,12 +310,93 @@ def test_con_catalogo_lee_estados_y_registra(cfg):
     assert r.dias_ok == 2
 
 
+def test_catalogo_dice_ok_pero_el_parquet_falta_o_esta_roto_se_rebaja(cfg):
+    sin_nada, truncado = HASTA, HASTA - timedelta(days=1)
+    m = escribir(cfg.data_dir, _tabla(truncado), "ticks", "dukascopy", "XAUUSD", truncado)
+    ruta = cfg.data_dir / m.ruta
+    ruta.write_bytes(ruta.read_bytes()[:20])  # Parquet cortado
+    cat = CatalogoFalso({sin_nada: "ok", truncado: "ok"})
+    f = FuenteFalsa({("XAUUSD", d): _ok(d) for d in (sin_nada, truncado)})
+    r = bajar(cfg, [_sim()], f, cat, desde=truncado, hoy=HOY)
+    assert sorted(d for _, d in f.llamadas) == [truncado, sin_nada]
+    assert r.dias_ok == 2
+    for d in (sin_nada, truncado):
+        assert estado(cfg.data_dir, "ticks", "dukascopy", "XAUUSD", d) == "ok"
+
+
+def test_catalogo_vacio_con_almacen_lleno_no_rebaja_nada(cfg):
+    desde = HASTA - timedelta(days=4)
+    f = FuenteFalsa({("XAUUSD", d): _ok(d) for d in _dias(3)})
+    bajar(cfg, [_sim()], f, None, desde=desde, hoy=HOY)
+    f.llamadas.clear()
+    cat = CatalogoFalso()
+    r = bajar(cfg, [_sim()], f, cat, desde=desde, hoy=HOY)
+    assert f.llamadas == []
+    assert r.dias_ok == 0 and cat.registrados == []
+
+
+def test_excepcion_inesperada_cierra_la_corrida_con_error(cfg, monkeypatch):
+    def _rompe(*a, **k):
+        raise RuntimeError("fallo inesperado")
+    monkeypatch.setattr(descarga, "_hechos_del_almacen", _rompe)
+    cat = CatalogoFalso()
+    with pytest.raises(RuntimeError, match="fallo inesperado"):
+        bajar(cfg, [_sim()], FuenteFalsa(), cat, desde=HASTA, hoy=HOY)
+    assert cat.corridas[1][0] == "error"
+    assert not (cfg.data_dir / "_registro" / "descarga.lock").exists()
+
+
+class FuenteSiempreOk(FuenteFalsa):
+    def bajar_dia(self, sim, dia):
+        self.llamadas.append((sim.simbolo, dia))
+        return _ok(dia)
+
+
+@pytest.mark.parametrize("funcion, fuente", [("escribir", FuenteSiempreOk),
+                                             ("marcar_vacio", FuenteFalsa)])
+def test_fallo_persistente_al_guardar_para_el_simbolo(cfg, monkeypatch, funcion, fuente):
+    def _disco_roto(*a, **k):
+        raise OSError("disco roto")
+    monkeypatch.setattr(descarga, funcion, _disco_roto)
+    f = fuente()
+    cat = CatalogoFalso()
+    r = bajar(cfg, [_sim()], f, cat, hoy=HOY)  # sin desde: no debe irse hasta el año 2000
+    assert "XAUUSD" in r.simbolos_parados and "disco roto" in r.simbolos_parados["XAUUSD"]
+    assert len(f.llamadas) == descarga.ERRORES_SEGUIDOS_PARA_PARAR
+    assert r.dias_error == descarga.ERRORES_SEGUIDOS_PARA_PARAR
+    assert len(cat.errores) == descarga.ERRORES_SEGUIDOS_PARA_PARAR
+
+
+def test_hasta_por_defecto_es_hoy_menos_2_dias(cfg):
+    f = FuenteFalsa()
+    bajar(cfg, [_sim()], f, None, desde=HOY - timedelta(days=5), hoy=HOY)
+    pedidos = [d for _, d in f.llamadas]
+    assert max(pedidos) == HOY - timedelta(days=2)
+    assert HOY - timedelta(days=1) not in pedidos
+
+
+def test_simbolo_sin_ningun_dato_se_para_con_aviso(cfg):
+    f = FuenteFalsa()  # todo vacío: como un código de fuente mal puesto
+    cat = CatalogoFalso()
+    r = bajar(cfg, [_sim()], f, cat, hoy=HOY)
+    assert r.simbolos_parados == {"XAUUSD": "ningún dato: ¿código de fuente mal puesto?"}
+    assert len(f.llamadas) == descarga.DIAS_VACIOS_PARA_PARAR
+    assert cat.inicios == []
+
+
+def test_simbolo_con_dato_antiguo_en_almacen_no_se_marca_sin_datos(cfg):
+    viejo = HASTA - timedelta(days=200)
+    escribir(cfg.data_dir, _tabla(viejo), "ticks", "dukascopy", "XAUUSD", viejo)
+    r = bajar(cfg, [_sim()], FuenteFalsa(), None, hoy=HOY)
+    assert r.simbolos_parados == {}
+
+
 def test_con_catalogo_ctrl_c_cierra_interrumpida(cfg):
     class Rompe(FuenteFalsa):
         def bajar_dia(self, sim, dia):
             raise KeyboardInterrupt
     cat = CatalogoFalso()
     with pytest.raises(KeyboardInterrupt):
-        bajar(cfg, [_sim()], Rompe(), cat, desde=HOY - timedelta(days=1), hoy=HOY)
+        bajar(cfg, [_sim()], Rompe(), cat, desde=HASTA, hoy=HOY)
     assert cat.corridas[1][0] == "interrumpida"
     assert not (cfg.data_dir / "_registro" / "descarga.lock").exists()
