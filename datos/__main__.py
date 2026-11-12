@@ -130,7 +130,8 @@ def _bajar(args, fuente, ruta, config) -> int:
         if cat:
             cat.cerrar()
     imprimir(res)
-    return 0 if res.dias_error == 0 and not res.simbolos_parados else 1
+    return 0 if (res.dias_error == 0 and not res.simbolos_parados
+                 and res.parado_por != "disco") else 1
 
 
 def _catalogo(accion: str, config=None) -> int:

@@ -234,8 +234,14 @@ def estado(raiz: Path, tipo: Tipo, fuente: str, simbolo: str, periodo: date,
     return "ok"
 
 
-def listar_manifiestos(raiz: Path, tipo: str | None = None) -> Iterator[Manifiesto]:
+def listar_manifiestos(raiz: Path, tipo: str | None = None, fuente: str | None = None,
+                       simbolo: str | None = None) -> Iterator[Manifiesto]:
+    """Manifiestos guardados. `fuente` y `simbolo` (con `tipo`) recortan la carpeta que se lee."""
     base = Path(raiz) / CARPETA_MANIFIESTOS / (tipo or "")
+    if tipo and fuente:
+        base = base / f"fuente={fuente}"
+        if simbolo:
+            base = base / f"simbolo={simbolo}"
     if not base.is_dir():
         return
     for p in sorted(base.rglob("*.json")):

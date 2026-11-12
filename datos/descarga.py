@@ -113,9 +113,7 @@ def candado(raiz: Path):
 def _hechos_del_almacen(cfg: Config, fuente: str, simbolo: str) -> dict[date, str]:
     """Estado por día leyendo los manifiestos del símbolo una sola vez."""
     hechos: dict[date, str] = {}
-    for m in listar_manifiestos(cfg.data_dir, TIPO):
-        if m.fuente != fuente or m.simbolo != simbolo:
-            continue
+    for m in listar_manifiestos(cfg.data_dir, TIPO, fuente, simbolo):
         dia = date.fromisoformat(m.periodo)
         e = estado(cfg.data_dir, TIPO, fuente, simbolo, dia)  # confirma que el Parquet está
         if e in ("ok", "vacio"):

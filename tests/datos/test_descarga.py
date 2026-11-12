@@ -228,3 +228,92 @@ def test_cli_sale_1_si_hay_errores(cfg, tmp_path):
 def test_pid_vivo_posix():
     assert descarga._pid_vivo(os.getpid()) is True
     assert descarga._pid_vivo(999999999) is False
+
+
+# --- correcciones de la revisión ---
+
+def test_leer_un_simbolo_no_lee_manifiestos_de_otro(cfg, monkeypatch):
+    from datos import almacen
+    d = HOY - timedelta(days=1)
+    f = FuenteFalsa({("XAUUSD", d): _ok(d), ("EURUSD", d): _ok(d, 1.1)})
+    syms = [_sim("XAUUSD"), _sim("EURUSD", "fx_mayor")]
+    bajar(cfg, syms, f, None, desde=d, hasta=d, hoy=HOY)
+    leidos = []
+    original = almacen.Manifiesto.from_json.__func__
+    monkeypatch.setattr(almacen.Manifiesto, "from_json",
+                        classmethod(lambda cls, t: (leidos.append(t), original(cls, t))[1]))
+    hechos = descarga._hechos_del_almacen(cfg, "dukascopy", "XAUUSD")
+    assert hechos == {d: "ok"}
+    assert leidos and all('"simbolo": "XAUUSD"' in t for t in leidos)
+
+
+def test_cli_disco_bajo_sale_1_y_max_horas_sale_0(cfg, tmp_path, monkeypatch):
+    ruta = _registro(tmp_path)
+    hasta = (date.today() - timedelta(days=1)).isoformat()
+    args = ["bajar", "--simbolo", "XAUUSD", "--desde", hasta, "--hasta", hasta]
+    monkeypatch.setattr(descarga, "espacio_libre_gb", lambda raiz: 0.1)
+    assert main(args, fuente=FuenteFalsa(), ruta=ruta, config=cfg) == 1
+    monkeypatch.setattr(descarga, "espacio_libre_gb", lambda raiz: 100.0)
+    assert main(args + ["--max-horas", "0"], fuente=FuenteFalsa(), ruta=ruta, config=cfg) == 0
+
+
+class CatalogoFalso:
+    """Catálogo en memoria con los mismos métodos que Catalogo."""
+
+    def __init__(self, estados=None):
+        self._estados = estados or {}
+        self.registrados, self.errores, self.inicios = [], [], []
+        self.corridas = {}
+        self.consultas = []
+
+    def estados(self, tipo, fuente, simbolo):
+        self.consultas.append((tipo, fuente, simbolo))
+        return dict(self._estados)
+
+    def registrar(self, m):
+        self.registrados.append((m.periodo, m.estado))
+
+    def registrar_error(self, tipo, fuente, simbolo, periodo, error):
+        self.errores.append((periodo, error))
+
+    def fijar_inicio(self, simbolo, fuente, inicio):
+        self.inicios.append((simbolo, fuente, inicio))
+
+    def abrir_corrida(self, orden):
+        self.corridas[1] = None
+        self.orden = orden
+        return 1
+
+    def cerrar_corrida(self, id, resultado, resumen):
+        self.corridas[id] = (resultado, resumen)
+
+
+def test_con_catalogo_lee_estados_y_registra(cfg):
+    ok1, ok2, malo = HOY - timedelta(days=10), HOY - timedelta(days=11), HOY - timedelta(days=3)
+    ya_hecho = HOY - timedelta(days=1)
+    cat = CatalogoFalso({ya_hecho: "ok"})
+    f = FuenteFalsa({("XAUUSD", ok1): _ok(ok1), ("XAUUSD", ok2): _ok(ok2),
+                     ("XAUUSD", malo): ResultadoDia("error", None, "HTTP 503")})
+    r = bajar(cfg, [_sim()], f, cat, hoy=HOY)
+    assert cat.consultas == [("ticks", "dukascopy", "XAUUSD")]
+    assert ya_hecho not in [d for _, d in f.llamadas]  # el estado salió del catálogo
+    assert ("2026-11-02", "ok") in cat.registrados and ("2026-11-01", "ok") in cat.registrados
+    assert any(e == "vacio" for _, e in cat.registrados)
+    assert [p for p, _ in cat.errores] == [malo]
+    assert cat.inicios == [("XAUUSD", "dukascopy", ok2)]  # el día ok más antiguo
+    assert cat.orden == "bajar"
+    resultado, resumen = cat.corridas[1]
+    assert resultado == "parcial"  # hubo un error
+    assert resumen["dias_ok"] == 2 and resumen["dias_error"] == 1 and "parado_por" in resumen
+    assert r.dias_ok == 2
+
+
+def test_con_catalogo_ctrl_c_cierra_interrumpida(cfg):
+    class Rompe(FuenteFalsa):
+        def bajar_dia(self, sim, dia):
+            raise KeyboardInterrupt
+    cat = CatalogoFalso()
+    with pytest.raises(KeyboardInterrupt):
+        bajar(cfg, [_sim()], Rompe(), cat, desde=HOY - timedelta(days=1), hoy=HOY)
+    assert cat.corridas[1][0] == "interrumpida"
+    assert not (cfg.data_dir / "_registro" / "descarga.lock").exists()
