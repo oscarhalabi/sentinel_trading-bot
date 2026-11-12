@@ -143,18 +143,22 @@ def nombre_canonico(inst) -> str:
 
 
 def fusionar_descubiertos(actuales: dict[str, Simbolo], descubiertos: list,
-                          fuente: str) -> tuple[dict[str, Simbolo], list[str], list[str]]:
+                          fuente: str, codigos_crudos: set[str] | None = None
+                          ) -> tuple[dict[str, Simbolo], list[str], list[str]]:
     """Mezcla lo descubierto con el registro. Devuelve (registro nuevo, nuevos, desaparecidos).
 
-    Los campos de `ajustado_a_mano` no se pisan; los nuevos entran con prioridad 2;
-    los que ya no aparecen quedan inactivos (nunca se borran).
+    Los campos de `ajustado_a_mano` no se pisan (tampoco `activo` ni `fuentes`); los nuevos
+    entran con prioridad 2. Desaparecido = su código ya no está en la lista CRUDA de la fuente
+    (`codigos_crudos`; si no se pasa, se usan los códigos de `descubiertos`): queda inactivo,
+    nunca se borra. Un instrumento que la fuente sigue listando pero que no supimos clasificar
+    NO cuenta como desaparecido. Un símbolo inactivo que reaparece vuelve a estar activo.
     """
     nuevo = dict(actuales)
     nuevos: list[str] = []
-    vistos: set[str] = set()
+    if codigos_crudos is None:
+        codigos_crudos = {i.codigo for i in descubiertos}
     for inst in descubiertos:
         nombre = nombre_canonico(inst)
-        vistos.add(nombre)
         horario = _horario_de(inst)
         actual = actuales.get(nombre)
         if actual is None:
@@ -163,11 +167,14 @@ def fusionar_descubiertos(actuales: dict[str, Simbolo], descubiertos: list,
             nuevos.append(nombre)
             continue
         campos = {"clase": inst.clase, "decimales": inst.decimales, "horario": horario,
-                  "divisa": inst.divisa}
+                  "divisa": inst.divisa, "activo": True,
+                  "fuentes": {**actual.fuentes, fuente: inst.codigo}}
         campos = {k: v for k, v in campos.items() if k not in actual.ajustado_a_mano}
-        nuevo[nombre] = replace(actual, fuentes={**actual.fuentes, fuente: inst.codigo}, **campos)
-    desaparecidos = sorted(n for n, s in actuales.items()
-                           if fuente in s.fuentes and n not in vistos and s.activo)
+        nuevo[nombre] = replace(actual, **campos)
+    desaparecidos = sorted(
+        n for n, s in actuales.items()
+        if fuente in s.fuentes and s.fuentes[fuente] not in codigos_crudos and s.activo
+        and "activo" not in s.ajustado_a_mano)
     for n in desaparecidos:
         nuevo[n] = replace(nuevo[n], activo=False)
     return nuevo, sorted(nuevos), desaparecidos

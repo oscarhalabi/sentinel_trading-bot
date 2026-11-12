@@ -115,10 +115,11 @@ def _clase(grupos: list[str], codigo: str) -> str | None:
     return None
 
 
-def _parsear_con_descartes(cuerpo: bytes) -> tuple[list[InstrumentoFuente], int]:
+def _parsear_con_descartes(cuerpo: bytes) -> tuple[list[InstrumentoFuente], int, set[str]]:
     """Convierte la respuesta de la lista de instrumentos (JSONP o JSON).
 
-    Devuelve (instrumentos, cuántos quedaron sin clase). Nunca falla por un instrumento raro.
+    Devuelve (instrumentos, cuántos quedaron sin clase, códigos crudos de TODOS los
+    instrumentos de la lista, aunque se hayan descartado). Nunca falla por un instrumento raro.
     formato provisional: verificar con la respuesta real en la laptop (Task 11 Step 3).
     """
     texto = cuerpo.decode("utf-8", errors="replace").strip()
@@ -135,9 +136,11 @@ def _parsear_con_descartes(cuerpo: bytes) -> tuple[list[InstrumentoFuente], int]
             grupos_de.setdefault(nombre, []).append(g.get("id", gid))
     resultado: list[InstrumentoFuente] = []
     sin_clase = 0
+    codigos: set[str] = set()
     for clave, c in crudos.items():
         try:
             codigo = c["historical_filename"]
+            codigos.add(codigo)
             divisa = c.get("quote_currency") or ""
             pip = float(c["pipValue"])
             decimales = round(-math.log10(pip)) + 1
@@ -156,7 +159,7 @@ def _parsear_con_descartes(cuerpo: bytes) -> tuple[list[InstrumentoFuente], int]
             pass
         resultado.append(InstrumentoFuente(codigo, c.get("name") or clave, clase,
                                            decimales, divisa, inicio))
-    return resultado, sin_clase
+    return resultado, sin_clase, codigos
 
 
 def parsear_instrumentos(cuerpo: bytes) -> list[InstrumentoFuente]:
@@ -185,6 +188,7 @@ class _Limitador:
 class Dukascopy:
     nombre = "dukascopy"
     sin_clase = 0  # instrumentos descartados en el último listado
+    codigos_crudos: set[str] = set()  # todos los códigos del último listado, descartados o no
 
     def __init__(self, http: ClienteHttp | None = None, max_paralelo: int = 4,
                  max_por_segundo: float = 20.0, reintentos: int = 4, espera_base: float = 1.0,
@@ -201,7 +205,7 @@ class Dukascopy:
         estado, cuerpo = self._http.get(URL_INSTRUMENTOS, 30.0, CABECERAS_INSTRUMENTOS)
         if estado != 200:
             raise RuntimeError(f"Lista de instrumentos: HTTP {estado}")
-        instrumentos, self.sin_clase = _parsear_con_descartes(cuerpo)
+        instrumentos, self.sin_clase, self.codigos_crudos = _parsear_con_descartes(cuerpo)
         return instrumentos
 
     def _bajar_hora(self, codigo: str, hora: datetime, decimales: int) -> pa.Table:

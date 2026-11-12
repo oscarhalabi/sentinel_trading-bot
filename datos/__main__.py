@@ -39,7 +39,14 @@ def _descubrir(aplicar: bool, fuente, ruta) -> int:
     except Exception as e:
         print(f"No se pudo listar los instrumentos: {e}", file=sys.stderr)
         return 1
-    nuevo, nuevos, desaparecidos = sim.fusionar_descubiertos(actuales, descubiertos, "dukascopy")
+    if not descubiertos:
+        print("La fuente devolvió una lista vacía o sin instrumentos reconocibles. "
+              "No se toca el registro.", file=sys.stderr)
+        return 1
+    crudos = getattr(fuente, "codigos_crudos", None) or None
+    nuevo, nuevos, desaparecidos = sim.fusionar_descubiertos(
+        actuales, descubiertos, "dukascopy", crudos)
+    reaparecidos = sorted(n for n in actuales if not actuales[n].activo and nuevo[n].activo)
     cambiados = sorted(n for n in actuales if n in nuevo and nuevo[n] != actuales[n]
                        and n not in desaparecidos)
     print(f"Instrumentos en la fuente: {len(descubiertos)}")
@@ -53,6 +60,15 @@ def _descubrir(aplicar: bool, fuente, ruta) -> int:
     print(f"Con cambios: {len(cambiados)}")
     for n in cambiados:
         print(f"  ~ {n}")
+    print(f"Reaparecidos (vuelven a activo): {len(reaparecidos)}")
+    for n in reaparecidos:
+        print(f"  * {n}")
+    con_codigo = [s for s in actuales.values() if s.activo and "dukascopy" in s.fuentes]
+    if con_codigo and len(desaparecidos) > 0.2 * len(con_codigo):
+        print(f"ATENCIÓN: desaparecerían {len(desaparecidos)} de {len(con_codigo)} símbolos "
+              "activos (más del 20 %). Parece un cambio de formato de la fuente, no se "
+              "escribe nada.", file=sys.stderr)
+        return 1
     if aplicar:
         sim.guardar(nuevo, ruta)
         print("Registro guardado.")

@@ -94,9 +94,21 @@ def test_listar_instrumentos_usa_referer():
     assert d.sin_clase == 1
 
 
+def _registro_chico(ruta, inactivos=()):
+    """Copia del registro con los símbolos que están en la muestra, más GBPAUD (no está)."""
+    from dataclasses import replace
+    from datos.simbolos import guardar
+    en_muestra = {"EURUSD", "USDJPY", "EURGBP", "XAUUSD", "XAGUSD", "US500", "DE40",
+                  "JP225", "WTI", "NVDA.US", "GBPAUD"}
+    reg = {n: s for n, s in cargar().items() if n in en_muestra}
+    for n in inactivos:
+        reg[n] = replace(reg[n], activo=False)
+    guardar(reg, ruta)
+
+
 def test_descubrir_sin_aplicar_no_escribe(tmp_path, capsys):
     ruta = tmp_path / "simbolos.json"
-    shutil.copy(RUTA_REGISTRO, ruta)
+    _registro_chico(ruta)
     antes = ruta.read_bytes()
     d = Dukascopy(http=_HttpFalso(MUESTRA.read_bytes()))
     assert main(["simbolos", "descubrir"], fuente=d, ruta=ruta) == 0
@@ -106,10 +118,67 @@ def test_descubrir_sin_aplicar_no_escribe(tmp_path, capsys):
 
 def test_descubrir_aplicar_guarda(tmp_path):
     ruta = tmp_path / "simbolos.json"
-    shutil.copy(RUTA_REGISTRO, ruta)
+    _registro_chico(ruta)
     d = Dukascopy(http=_HttpFalso(MUESTRA.read_bytes()))
     assert main(["simbolos", "descubrir", "--aplicar"], fuente=d, ruta=ruta) == 0
     reg = cargar(ruta)
     assert reg["SAP.DE"].prioridad == 2 and reg["SAP.DE"].horario == "accion_eu"
     assert reg["XAUUSD"].prioridad == 1
     assert reg["GBPAUD"].activo is False  # no está en la muestra
+
+
+def test_sin_clase_no_es_desaparecido():
+    actuales = {"XAUUSD": _sim(), "XAGUSD": _sim("XAGUSD")}
+    nuevo, _, desap = fusionar_descubiertos(actuales, [_inst("XAUUSD")], "dukascopy",
+                                            codigos_crudos={"XAUUSD", "XAGUSD"})
+    assert desap == [] and nuevo["XAGUSD"].activo
+
+
+def test_activo_y_fuentes_ajustados_no_se_pisan():
+    actuales = {"XAUUSD": _sim(activo=False, fuentes={"dukascopy": "VIEJO"},
+                               ajustado_a_mano=("activo", "fuentes"))}
+    nuevo, _, _ = fusionar_descubiertos(actuales, [_inst("XAUUSD")], "dukascopy")
+    assert nuevo["XAUUSD"].activo is False
+    assert nuevo["XAUUSD"].fuentes == {"dukascopy": "VIEJO"}
+
+
+def test_activo_ajustado_no_se_desactiva():
+    actuales = {"XAGUSD": _sim("XAGUSD", ajustado_a_mano=("activo",))}
+    nuevo, _, desap = fusionar_descubiertos(actuales, [_inst("XAUUSD")], "dukascopy")
+    assert desap == [] and nuevo["XAGUSD"].activo
+
+
+def test_reaparecido_vuelve_a_activo(tmp_path, capsys):
+    ruta = tmp_path / "simbolos.json"
+    _registro_chico(ruta, inactivos=("XAUUSD",))
+    d = Dukascopy(http=_HttpFalso(MUESTRA.read_bytes()))
+    assert main(["simbolos", "descubrir", "--aplicar"], fuente=d, ruta=ruta) == 0
+    assert cargar(ruta)["XAUUSD"].activo is True
+    assert "* XAUUSD" in capsys.readouterr().out
+
+
+def test_reaparecido_con_activo_ajustado_sigue_inactivo():
+    actuales = {"XAUUSD": _sim(activo=False, ajustado_a_mano=("activo",))}
+    nuevo, _, _ = fusionar_descubiertos(actuales, [_inst("XAUUSD")], "dukascopy")
+    assert nuevo["XAUUSD"].activo is False
+
+
+def test_cli_lista_vacia_no_escribe(tmp_path, capsys):
+    ruta = tmp_path / "simbolos.json"
+    shutil.copy(RUTA_REGISTRO, ruta)
+    antes = ruta.read_bytes()
+    cuerpo = json.dumps({"instruments": {}, "groups": {}}).encode()
+    d = Dukascopy(http=_HttpFalso(cuerpo))
+    assert main(["simbolos", "descubrir", "--aplicar"], fuente=d, ruta=ruta) == 1
+    assert ruta.read_bytes() == antes
+    assert "vacía" in capsys.readouterr().err
+
+
+def test_cli_guardia_20_por_ciento(tmp_path, capsys):
+    ruta = tmp_path / "simbolos.json"
+    shutil.copy(RUTA_REGISTRO, ruta)
+    antes = ruta.read_bytes()
+    d = Dukascopy(http=_HttpFalso(MUESTRA.read_bytes()))  # solo 15 de 39 símbolos
+    assert main(["simbolos", "descubrir", "--aplicar"], fuente=d, ruta=ruta) == 1
+    assert ruta.read_bytes() == antes
+    assert "20 %" in capsys.readouterr().err
