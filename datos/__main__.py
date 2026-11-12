@@ -24,6 +24,11 @@ def construir_parser() -> argparse.ArgumentParser:
             d = ssub.add_parser("descubrir", help="Busca instrumentos nuevos en Dukascopy")
             d.add_argument("--aplicar", action="store_true",
                            help="Guarda los cambios (sin esto solo muestra el resumen)")
+        if nombre == "catalogo":
+            csub = sp.add_subparsers(dest="accion", metavar="accion")
+            csub.add_parser("migrar", help="Crea o actualiza las tablas del catálogo")
+            csub.add_parser("reconstruir", help="Rehace el catálogo desde los manifiestos")
+            csub.add_parser("estado", help="Resume lo que hay por símbolo")
     return p
 
 
@@ -77,6 +82,44 @@ def _descubrir(aplicar: bool, fuente, ruta) -> int:
     return 0
 
 
+def _catalogo(accion: str, config=None) -> int:
+    from datetime import date
+
+    from datos.catalogo import Catalogo, dias_pendientes
+    from datos.config import cargar_config
+
+    cfg = config if config is not None else cargar_config()
+    if not cfg.pg_dsn:
+        print("Falta DATOS_PG_DSN: no hay base de datos del catálogo configurada.",
+              file=sys.stderr)
+        return 1
+    try:
+        cat = Catalogo(cfg.pg_dsn)
+    except Exception as e:  # el mensaje de psycopg2 puede traer el DSN: no se imprime
+        print(f"No se pudo conectar al Postgres del catálogo ({type(e).__name__}).",
+              file=sys.stderr)
+        return 1
+    with cat:
+        if accion == "migrar":
+            hechas = cat.migrar()
+            print("Migraciones aplicadas:", ", ".join(hechas) if hechas else "ninguna (al día)")
+        elif accion == "reconstruir":
+            print(f"Catálogo reconstruido: {cat.reconstruir(cfg.data_dir)} particiones.")
+        else:
+            filas = cat.resumen_estado()
+            if not filas:
+                print("El catálogo está vacío.")
+            for sim, fuente, tipo, ok, vacio, error, inicio, p_min, p_max in filas:
+                faltan = "n/d"
+                if tipo == "ticks" and inicio:
+                    hechos = cat.estados(tipo, fuente, sim)
+                    faltan = sum(1 for d in dias_pendientes(hechos, inicio, date.today())
+                                 if d not in hechos)
+                print(f"{sim} [{fuente}/{tipo}]: ok={ok} vacio={vacio} error={error} "
+                      f"faltantes={faltan} inicio={inicio or '-'}")
+    return 0
+
+
 def main(argv: list[str] | None = None, fuente=None, ruta=None) -> int:
     p = construir_parser()
     args = p.parse_args(argv)
@@ -85,6 +128,11 @@ def main(argv: list[str] | None = None, fuente=None, ruta=None) -> int:
         return 2
     if args.orden == "simbolos" and getattr(args, "accion", None) == "descubrir":
         return _descubrir(args.aplicar, fuente, ruta)
+    if args.orden == "catalogo":
+        if getattr(args, "accion", None) is None:
+            print("Falta la acción: migrar, reconstruir o estado.", file=sys.stderr)
+            return 2
+        return _catalogo(args.accion)
     print("Orden aún no disponible", file=sys.stderr)
     return 2
 
