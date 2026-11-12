@@ -1,0 +1,575 @@
+{
+  "version": 1,
+  "simbolos": [
+    {
+      "simbolo": "AAPL.US",
+      "clase": "accion",
+      "prioridad": 1,
+      "fuentes": {
+        "dukascopy": "AAPLUSUSD"
+      },
+      "decimales": 3,
+      "horario": "accion_us",
+      "divisa": "USD",
+      "activo": true,
+      "ajustado_a_mano": [
+        "prioridad"
+      ]
+    },
+    {
+      "simbolo": "AMZN.US",
+      "clase": "accion",
+      "prioridad": 1,
+      "fuentes": {
+        "dukascopy": "AMZNUSUSD"
+      },
+      "decimales": 3,
+      "horario": "accion_us",
+      "divisa": "USD",
+      "activo": true,
+      "ajustado_a_mano": [
+        "prioridad"
+      ]
+    },
+    {
+      "simbolo": "AUDJPY",
+      "clase": "fx_cruce",
+      "prioridad": 1,
+      "fuentes": {
+        "dukascopy": "AUDJPY"
+      },
+      "decimales": 3,
+      "horario": "fx",
+      "divisa": "JPY",
+      "activo": true,
+      "ajustado_a_mano": [
+        "prioridad"
+      ]
+    },
+    {
+      "simbolo": "AUDNZD",
+      "clase": "fx_cruce",
+      "prioridad": 1,
+      "fuentes": {
+        "dukascopy": "AUDNZD"
+      },
+      "decimales": 5,
+      "horario": "fx",
+      "divisa": "NZD",
+      "activo": true,
+      "ajustado_a_mano": [
+        "prioridad"
+      ]
+    },
+    {
+      "simbolo": "AUDUSD",
+      "clase": "fx_mayor",
+      "prioridad": 1,
+      "fuentes": {
+        "dukascopy": "AUDUSD"
+      },
+      "decimales": 5,
+      "horario": "fx",
+      "divisa": "USD",
+      "activo": true,
+      "ajustado_a_mano": [
+        "prioridad"
+      ]
+    },
+    {
+      "simbolo": "BRENT",
+      "clase": "energia",
+      "prioridad": 1,
+      "fuentes": {
+        "dukascopy": "BRENTCMDUSD"
+      },
+      "decimales": 3,
+      "horario": "energia",
+      "divisa": "USD",
+      "activo": true,
+      "ajustado_a_mano": [
+        "prioridad"
+      ]
+    },
+    {
+      "simbolo": "BTCUSD",
+      "clase": "cripto",
+      "prioridad": 1,
+      "fuentes": {
+        "dukascopy": "BTCUSD"
+      },
+      "decimales": 1,
+      "horario": "cripto_24x7",
+      "divisa": "USD",
+      "activo": true,
+      "ajustado_a_mano": [
+        "prioridad"
+      ]
+    },
+    {
+      "simbolo": "CADJPY",
+      "clase": "fx_cruce",
+      "prioridad": 1,
+      "fuentes": {
+        "dukascopy": "CADJPY"
+      },
+      "decimales": 3,
+      "horario": "fx",
+      "divisa": "JPY",
+      "activo": true,
+      "ajustado_a_mano": [
+        "prioridad"
+      ]
+    },
+    {
+      "simbolo": "DE40",
+      "clase": "indice",
+      "prioridad": 1,
+      "fuentes": {
+        "dukascopy": "DEUIDXEUR"
+      },
+      "decimales": 3,
+      "horario": "indice_eu",
+      "divisa": "EUR",
+      "activo": true,
+      "ajustado_a_mano": [
+        "prioridad"
+      ]
+    },
+    {
+      "simbolo": "ETHUSD",
+      "clase": "cripto",
+      "prioridad": 1,
+      "fuentes": {
+        "dukascopy": "ETHUSD"
+      },
+      "decimales": 1,
+      "horario": "cripto_24x7",
+      "divisa": "USD",
+      "activo": true,
+      "ajustado_a_mano": [
+        "prioridad"
+      ]
+    },
+    {
+      "simbolo": "EURAUD",
+      "clase": "fx_cruce",
+      "prioridad": 1,
+      "fuentes": {
+        "dukascopy": "EURAUD"
+      },
+      "decimales": 5,
+      "horario": "fx",
+      "divisa": "AUD",
+      "activo": true,
+      "ajustado_a_mano": [
+        "prioridad"
+      ]
+    },
+    {
+      "simbolo": "EURCAD",
+      "clase": "fx_cruce",
+      "prioridad": 1,
+      "fuentes": {
+        "dukascopy": "EURCAD"
+      },
+      "decimales": 5,
+      "horario": "fx",
+      "divisa": "CAD",
+      "activo": true,
+      "ajustado_a_mano": [
+        "prioridad"
+      ]
+    },
+    {
+      "simbolo": "EURCHF",
+      "clase": "fx_cruce",
+      "prioridad": 1,
+      "fuentes": {
+        "dukascopy": "EURCHF"
+      },
+      "decimales": 5,
+      "horario": "fx",
+      "divisa": "CHF",
+      "activo": true,
+      "ajustado_a_mano": [
+        "prioridad"
+      ]
+    },
+    {
+      "simbolo": "EURGBP",
+      "clase": "fx_cruce",
+      "prioridad": 1,
+      "fuentes": {
+        "dukascopy": "EURGBP"
+      },
+      "decimales": 5,
+      "horario": "fx",
+      "divisa": "GBP",
+      "activo": true,
+      "ajustado_a_mano": [
+        "prioridad"
+      ]
+    },
+    {
+      "simbolo": "EURJPY",
+      "clase": "fx_cruce",
+      "prioridad": 1,
+      "fuentes": {
+        "dukascopy": "EURJPY"
+      },
+      "decimales": 3,
+      "horario": "fx",
+      "divisa": "JPY",
+      "activo": true,
+      "ajustado_a_mano": [
+        "prioridad"
+      ]
+    },
+    {
+      "simbolo": "EURUSD",
+      "clase": "fx_mayor",
+      "prioridad": 1,
+      "fuentes": {
+        "dukascopy": "EURUSD"
+      },
+      "decimales": 5,
+      "horario": "fx",
+      "divisa": "USD",
+      "activo": true,
+      "ajustado_a_mano": [
+        "prioridad"
+      ]
+    },
+    {
+      "simbolo": "GBPAUD",
+      "clase": "fx_cruce",
+      "prioridad": 1,
+      "fuentes": {
+        "dukascopy": "GBPAUD"
+      },
+      "decimales": 5,
+      "horario": "fx",
+      "divisa": "AUD",
+      "activo": true,
+      "ajustado_a_mano": [
+        "prioridad"
+      ]
+    },
+    {
+      "simbolo": "GBPCHF",
+      "clase": "fx_cruce",
+      "prioridad": 1,
+      "fuentes": {
+        "dukascopy": "GBPCHF"
+      },
+      "decimales": 5,
+      "horario": "fx",
+      "divisa": "CHF",
+      "activo": true,
+      "ajustado_a_mano": [
+        "prioridad"
+      ]
+    },
+    {
+      "simbolo": "GBPJPY",
+      "clase": "fx_cruce",
+      "prioridad": 1,
+      "fuentes": {
+        "dukascopy": "GBPJPY"
+      },
+      "decimales": 3,
+      "horario": "fx",
+      "divisa": "JPY",
+      "activo": true,
+      "ajustado_a_mano": [
+        "prioridad"
+      ]
+    },
+    {
+      "simbolo": "GBPUSD",
+      "clase": "fx_mayor",
+      "prioridad": 1,
+      "fuentes": {
+        "dukascopy": "GBPUSD"
+      },
+      "decimales": 5,
+      "horario": "fx",
+      "divisa": "USD",
+      "activo": true,
+      "ajustado_a_mano": [
+        "prioridad"
+      ]
+    },
+    {
+      "simbolo": "GOOGL.US",
+      "clase": "accion",
+      "prioridad": 1,
+      "fuentes": {
+        "dukascopy": "GOOGLUSUSD"
+      },
+      "decimales": 3,
+      "horario": "accion_us",
+      "divisa": "USD",
+      "activo": true,
+      "ajustado_a_mano": [
+        "prioridad"
+      ]
+    },
+    {
+      "simbolo": "JP225",
+      "clase": "indice",
+      "prioridad": 1,
+      "fuentes": {
+        "dukascopy": "JPNIDXJPY"
+      },
+      "decimales": 3,
+      "horario": "indice_asia",
+      "divisa": "JPY",
+      "activo": true,
+      "ajustado_a_mano": [
+        "prioridad"
+      ]
+    },
+    {
+      "simbolo": "META.US",
+      "clase": "accion",
+      "prioridad": 1,
+      "fuentes": {
+        "dukascopy": "METAUSUSD"
+      },
+      "decimales": 3,
+      "horario": "accion_us",
+      "divisa": "USD",
+      "activo": true,
+      "ajustado_a_mano": [
+        "prioridad"
+      ]
+    },
+    {
+      "simbolo": "MSFT.US",
+      "clase": "accion",
+      "prioridad": 1,
+      "fuentes": {
+        "dukascopy": "MSFTUSUSD"
+      },
+      "decimales": 3,
+      "horario": "accion_us",
+      "divisa": "USD",
+      "activo": true,
+      "ajustado_a_mano": [
+        "prioridad"
+      ]
+    },
+    {
+      "simbolo": "NVDA.US",
+      "clase": "accion",
+      "prioridad": 1,
+      "fuentes": {
+        "dukascopy": "NVDAUSUSD"
+      },
+      "decimales": 3,
+      "horario": "accion_us",
+      "divisa": "USD",
+      "activo": true,
+      "ajustado_a_mano": [
+        "prioridad"
+      ]
+    },
+    {
+      "simbolo": "NZDJPY",
+      "clase": "fx_cruce",
+      "prioridad": 1,
+      "fuentes": {
+        "dukascopy": "NZDJPY"
+      },
+      "decimales": 3,
+      "horario": "fx",
+      "divisa": "JPY",
+      "activo": true,
+      "ajustado_a_mano": [
+        "prioridad"
+      ]
+    },
+    {
+      "simbolo": "NZDUSD",
+      "clase": "fx_mayor",
+      "prioridad": 1,
+      "fuentes": {
+        "dukascopy": "NZDUSD"
+      },
+      "decimales": 5,
+      "horario": "fx",
+      "divisa": "USD",
+      "activo": true,
+      "ajustado_a_mano": [
+        "prioridad"
+      ]
+    },
+    {
+      "simbolo": "TSLA.US",
+      "clase": "accion",
+      "prioridad": 1,
+      "fuentes": {
+        "dukascopy": "TSLAUSUSD"
+      },
+      "decimales": 3,
+      "horario": "accion_us",
+      "divisa": "USD",
+      "activo": true,
+      "ajustado_a_mano": [
+        "prioridad"
+      ]
+    },
+    {
+      "simbolo": "UK100",
+      "clase": "indice",
+      "prioridad": 1,
+      "fuentes": {
+        "dukascopy": "GBRIDXGBP"
+      },
+      "decimales": 3,
+      "horario": "indice_eu",
+      "divisa": "GBP",
+      "activo": true,
+      "ajustado_a_mano": [
+        "prioridad"
+      ]
+    },
+    {
+      "simbolo": "US100",
+      "clase": "indice",
+      "prioridad": 1,
+      "fuentes": {
+        "dukascopy": "USATECHIDXUSD"
+      },
+      "decimales": 3,
+      "horario": "indice_us",
+      "divisa": "USD",
+      "activo": true,
+      "ajustado_a_mano": [
+        "prioridad"
+      ]
+    },
+    {
+      "simbolo": "US30",
+      "clase": "indice",
+      "prioridad": 1,
+      "fuentes": {
+        "dukascopy": "USA30IDXUSD"
+      },
+      "decimales": 3,
+      "horario": "indice_us",
+      "divisa": "USD",
+      "activo": true,
+      "ajustado_a_mano": [
+        "prioridad"
+      ]
+    },
+    {
+      "simbolo": "US500",
+      "clase": "indice",
+      "prioridad": 1,
+      "fuentes": {
+        "dukascopy": "USA500IDXUSD"
+      },
+      "decimales": 3,
+      "horario": "indice_us",
+      "divisa": "USD",
+      "activo": true,
+      "ajustado_a_mano": [
+        "prioridad"
+      ]
+    },
+    {
+      "simbolo": "USDCAD",
+      "clase": "fx_mayor",
+      "prioridad": 1,
+      "fuentes": {
+        "dukascopy": "USDCAD"
+      },
+      "decimales": 5,
+      "horario": "fx",
+      "divisa": "CAD",
+      "activo": true,
+      "ajustado_a_mano": [
+        "prioridad"
+      ]
+    },
+    {
+      "simbolo": "USDCHF",
+      "clase": "fx_mayor",
+      "prioridad": 1,
+      "fuentes": {
+        "dukascopy": "USDCHF"
+      },
+      "decimales": 5,
+      "horario": "fx",
+      "divisa": "CHF",
+      "activo": true,
+      "ajustado_a_mano": [
+        "prioridad"
+      ]
+    },
+    {
+      "simbolo": "USDJPY",
+      "clase": "fx_mayor",
+      "prioridad": 1,
+      "fuentes": {
+        "dukascopy": "USDJPY"
+      },
+      "decimales": 3,
+      "horario": "fx",
+      "divisa": "JPY",
+      "activo": true,
+      "ajustado_a_mano": [
+        "prioridad"
+      ]
+    },
+    {
+      "simbolo": "WTI",
+      "clase": "energia",
+      "prioridad": 1,
+      "fuentes": {
+        "dukascopy": "LIGHTCMDUSD"
+      },
+      "decimales": 3,
+      "horario": "energia",
+      "divisa": "USD",
+      "activo": true,
+      "ajustado_a_mano": [
+        "prioridad"
+      ]
+    },
+    {
+      "simbolo": "XAGUSD",
+      "clase": "metal",
+      "prioridad": 1,
+      "fuentes": {
+        "dukascopy": "XAGUSD"
+      },
+      "decimales": 3,
+      "horario": "metal",
+      "divisa": "USD",
+      "activo": true,
+      "ajustado_a_mano": [
+        "prioridad"
+      ]
+    },
+    {
+      "simbolo": "XAUUSD",
+      "clase": "metal",
+      "prioridad": 1,
+      "fuentes": {
+        "dukascopy": "XAUUSD"
+      },
+      "decimales": 3,
+      "horario": "metal",
+      "divisa": "USD",
+      "activo": true,
+      "ajustado_a_mano": [
+        "prioridad"
+      ]
+    }
+  ]
+}
