@@ -37,8 +37,9 @@ el mantenimiento automático (2D) y el libro de órdenes (2E) se apoyan en ella.
 
 ## 4. Estructura
 
-Paquete nuevo `datos/` en el repo. `motor/` nunca importa `datos/` (y al revés), así un fallo en
-los datos no puede tumbar al bot. Cada pieza hace una sola cosa:
+Paquete nuevo `datos/` en el repo. `motor/` nunca importa `datos/`, así un fallo en los datos no
+puede tumbar al bot. `datos/` solo reutiliza dos funciones puras ya existentes:
+`motor.registry.read_env_file` (lector de `.env`) y `scripts.localdb_migrate.apply_pending` (migraciones). Cada pieza hace una sola cosa:
 
 | Pieza | Qué hace | Depende de |
 |---|---|---|
