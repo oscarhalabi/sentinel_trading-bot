@@ -26,7 +26,9 @@ sesgadas por las instrucciones de aquel repo. Todo lo de estrategia se investiga
 4. **Laboratorio**: econometría, simulación y prueba masiva de variantes.
 5. **Bot nuevo** que se adapta al régimen de mercado.
 
-Cada fase se diseña (brainstorming) por separado. Los diseños y planes están en
+Cada fase se diseña (brainstorming) por separado. Fase 2: mapa en
+`docs/superpowers/specs/2026-11-12-fase2-datos-historicos-design.md` (subproyectos 2A–2E; memoria
+`fase2-datos-decisiones`). Los datos y la simulación van en la laptop de Oscar, no en el VPS. Los diseños y planes están en
 `docs/superpowers/specs/` y `docs/superpowers/plans/`.
 
 ## Cómo está armado (resumen)

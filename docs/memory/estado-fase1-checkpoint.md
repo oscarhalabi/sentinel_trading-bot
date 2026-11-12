@@ -45,7 +45,7 @@ Checkpoint del 2026-11-03. Leer junto a [[fork-fase1-decisiones]] (allí están 
 2. Pueden esperar (los motores nulos no operan): alta de lozada.console+n1 cuando Daniel cree la demo,
    y AutoTrading apagado en los clones nuevos (Ctrl+E; `provision` no lo activa si el `common.ini` ya
    existe). Hay que hacerlos antes de que un motor opere.
-3. Después: brainstorming de la Fase 2 (datos históricos).
+3. ~~Brainstorming de la Fase 2 (datos históricos)~~: hecho el 2026-11-12, ver [[fase2-datos-decisiones]].
 
 ## Avisar a Daniel la próxima vez que escriba (pedido por Oscar, 2026-11-03)
 
