@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from datos.horarios import HORARIOS
@@ -111,3 +111,63 @@ def ordenar_para_descarga(simbolos: dict[str, Simbolo]) -> list[Simbolo]:
     """Solo activos; prioridad 1 antes que 2; después por nombre."""
     return sorted((s for s in simbolos.values() if s.activo),
                   key=lambda s: (s.prioridad, s.simbolo))
+
+
+_INDICES_CANONICOS = {
+    "USA500IDXUSD": "US500", "USATECHIDXUSD": "US100", "USA30IDXUSD": "US30",
+    "DEUIDXEUR": "DE40", "GBRIDXGBP": "UK100", "JPNIDXJPY": "JP225",
+}
+_ENERGIA_CANONICA = {"LIGHTCMDUSD": "WTI", "BRENTCMDUSD": "BRENT"}
+
+
+def _horario_de(inst) -> str:
+    """Horario según la clase y la divisa del instrumento."""
+    c = inst.clase
+    if c in ("fx_mayor", "fx_cruce", "fx_exotico"):
+        return "fx"
+    if c == "indice":
+        return ("indice_us" if inst.divisa == "USD"
+                else "indice_asia" if inst.divisa in ("JPY", "HKD", "AUD") else "indice_eu")
+    if c in ("accion", "etf"):
+        return "accion_us" if inst.divisa == "USD" else "accion_eu"
+    return "cripto_24x7" if c == "cripto" else c  # metal, energia y materia_prima se llaman igual
+
+
+def nombre_canonico(inst) -> str:
+    """Nombre propio del símbolo: divisas y metales tal cual, acciones <TICKER>.<PAÍS>."""
+    if inst.clase in ("accion", "etf"):
+        ticker = inst.nombre.split("/")[0].strip()
+        if "." in ticker:
+            return ticker
+    return _INDICES_CANONICOS.get(inst.codigo) or _ENERGIA_CANONICA.get(inst.codigo) or inst.codigo
+
+
+def fusionar_descubiertos(actuales: dict[str, Simbolo], descubiertos: list,
+                          fuente: str) -> tuple[dict[str, Simbolo], list[str], list[str]]:
+    """Mezcla lo descubierto con el registro. Devuelve (registro nuevo, nuevos, desaparecidos).
+
+    Los campos de `ajustado_a_mano` no se pisan; los nuevos entran con prioridad 2;
+    los que ya no aparecen quedan inactivos (nunca se borran).
+    """
+    nuevo = dict(actuales)
+    nuevos: list[str] = []
+    vistos: set[str] = set()
+    for inst in descubiertos:
+        nombre = nombre_canonico(inst)
+        vistos.add(nombre)
+        horario = _horario_de(inst)
+        actual = actuales.get(nombre)
+        if actual is None:
+            nuevo[nombre] = Simbolo(nombre, inst.clase, 2, {fuente: inst.codigo},
+                                    inst.decimales, horario, inst.divisa)
+            nuevos.append(nombre)
+            continue
+        campos = {"clase": inst.clase, "decimales": inst.decimales, "horario": horario,
+                  "divisa": inst.divisa}
+        campos = {k: v for k, v in campos.items() if k not in actual.ajustado_a_mano}
+        nuevo[nombre] = replace(actual, fuentes={**actual.fuentes, fuente: inst.codigo}, **campos)
+    desaparecidos = sorted(n for n, s in actuales.items()
+                           if fuente in s.fuentes and n not in vistos and s.activo)
+    for n in desaparecidos:
+        nuevo[n] = replace(nuevo[n], activo=False)
+    return nuevo, sorted(nuevos), desaparecidos

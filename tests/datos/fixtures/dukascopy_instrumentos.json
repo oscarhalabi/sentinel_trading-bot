@@ -1,0 +1,225 @@
+{
+ "instruments": {
+  "EUR/USD": {
+   "name": "EUR/USD",
+   "description": "EUR/USD",
+   "historical_filename": "EURUSD",
+   "pipValue": 0.0001,
+   "base_currency": "EUR",
+   "quote_currency": "USD",
+   "history_start_tick": "1072915200000"
+  },
+  "USD/JPY": {
+   "name": "USD/JPY",
+   "description": "USD/JPY",
+   "historical_filename": "USDJPY",
+   "pipValue": 0.01,
+   "base_currency": "USD",
+   "quote_currency": "JPY",
+   "history_start_tick": "1072915200000"
+  },
+  "EUR/GBP": {
+   "name": "EUR/GBP",
+   "description": "EUR/GBP",
+   "historical_filename": "EURGBP",
+   "pipValue": 0.0001,
+   "base_currency": "EUR",
+   "quote_currency": "GBP",
+   "history_start_tick": "1072915200000"
+  },
+  "USD/TRY": {
+   "name": "USD/TRY",
+   "description": "USD/TRY",
+   "historical_filename": "USDTRY",
+   "pipValue": 0.0001,
+   "base_currency": "USD",
+   "quote_currency": "TRY",
+   "history_start_tick": "1072915200000"
+  },
+  "XAU/USD": {
+   "name": "XAU/USD",
+   "description": "XAU/USD",
+   "historical_filename": "XAUUSD",
+   "pipValue": 0.01,
+   "base_currency": "XAU",
+   "quote_currency": "USD",
+   "history_start_tick": "1072915200000"
+  },
+  "XAG/USD": {
+   "name": "XAG/USD",
+   "description": "XAG/USD",
+   "historical_filename": "XAGUSD",
+   "pipValue": 0.01,
+   "base_currency": "XAG",
+   "quote_currency": "USD",
+   "history_start_tick": "1072915200000"
+  },
+  "USA500.IDX/USD": {
+   "name": "USA500.IDX/USD",
+   "description": "USA500.IDX/USD",
+   "historical_filename": "USA500IDXUSD",
+   "pipValue": 0.01,
+   "base_currency": "USA500",
+   "quote_currency": "USD",
+   "history_start_tick": "1072915200000"
+  },
+  "DEU.IDX/EUR": {
+   "name": "DEU.IDX/EUR",
+   "description": "DEU.IDX/EUR",
+   "historical_filename": "DEUIDXEUR",
+   "pipValue": 0.01,
+   "base_currency": "DEU",
+   "quote_currency": "EUR",
+   "history_start_tick": "1072915200000"
+  },
+  "JPN.IDX/JPY": {
+   "name": "JPN.IDX/JPY",
+   "description": "JPN.IDX/JPY",
+   "historical_filename": "JPNIDXJPY",
+   "pipValue": 0.01,
+   "base_currency": "JPN",
+   "quote_currency": "JPY",
+   "history_start_tick": "1072915200000"
+  },
+  "LIGHT.CMD/USD": {
+   "name": "LIGHT.CMD/USD",
+   "description": "LIGHT.CMD/USD",
+   "historical_filename": "LIGHTCMDUSD",
+   "pipValue": 0.01,
+   "base_currency": "LIGHT",
+   "quote_currency": "USD",
+   "history_start_tick": "1072915200000"
+  },
+  "COPPER.CMD/USD": {
+   "name": "COPPER.CMD/USD",
+   "description": "COPPER.CMD/USD",
+   "historical_filename": "COPPERCMDUSD",
+   "pipValue": 0.0001,
+   "base_currency": "COPPER",
+   "quote_currency": "USD",
+   "history_start_tick": "1072915200000"
+  },
+  "NVDA.US/USD": {
+   "name": "NVDA.US/USD",
+   "description": "NVDA.US/USD",
+   "historical_filename": "NVDAUSUSD",
+   "pipValue": 0.01,
+   "base_currency": "NVDA",
+   "quote_currency": "USD",
+   "history_start_tick": "1500000000000"
+  },
+  "SAP.DE/EUR": {
+   "name": "SAP.DE/EUR",
+   "description": "SAP.DE/EUR",
+   "historical_filename": "SAPDEEUR",
+   "pipValue": 0.01,
+   "base_currency": "SAP",
+   "quote_currency": "EUR",
+   "history_start_tick": "1072915200000"
+  },
+  "SPY.US/USD": {
+   "name": "SPY.US/USD",
+   "description": "SPY.US/USD",
+   "historical_filename": "SPYUSUSD",
+   "pipValue": 0.01,
+   "base_currency": "SPY",
+   "quote_currency": "USD",
+   "history_start_tick": "1072915200000"
+  },
+  "BTC/USD": {
+   "name": "BTC/USD",
+   "description": "BTC/USD",
+   "historical_filename": "BTCUSD",
+   "pipValue": 1,
+   "base_currency": "BTC",
+   "quote_currency": "USD",
+   "history_start_tick": "1072915200000"
+  },
+  "RARO/USD": {
+   "name": "RARO/USD",
+   "description": "RARO/USD",
+   "historical_filename": "RAROUSD",
+   "pipValue": 0.01,
+   "base_currency": "RARO",
+   "quote_currency": "USD",
+   "history_start_tick": "1072915200000"
+  }
+ },
+ "groups": {
+  "FX_MAJORS": {
+   "id": "FX_MAJORS",
+   "parent": "X",
+   "instruments": [
+    "EUR/USD",
+    "USD/JPY"
+   ]
+  },
+  "FX_CROSSES": {
+   "id": "FX_CROSSES",
+   "parent": "X",
+   "instruments": [
+    "EUR/GBP"
+   ]
+  },
+  "FX_EXOTICS": {
+   "id": "FX_EXOTICS",
+   "parent": "X",
+   "instruments": [
+    "USD/TRY"
+   ]
+  },
+  "FX_METALS": {
+   "id": "FX_METALS",
+   "parent": "X",
+   "instruments": [
+    "XAU/USD",
+    "XAG/USD"
+   ]
+  },
+  "CFD_INDICES": {
+   "id": "CFD_INDICES",
+   "parent": "X",
+   "instruments": [
+    "USA500.IDX/USD",
+    "DEU.IDX/EUR",
+    "JPN.IDX/JPY"
+   ]
+  },
+  "CFD_COMMODITIES": {
+   "id": "CFD_COMMODITIES",
+   "parent": "X",
+   "instruments": [
+    "LIGHT.CMD/USD",
+    "COPPER.CMD/USD"
+   ]
+  },
+  "STCK_US": {
+   "id": "STCK_US",
+   "parent": "X",
+   "instruments": [
+    "NVDA.US/USD"
+   ]
+  },
+  "STCK_DE": {
+   "id": "STCK_DE",
+   "parent": "X",
+   "instruments": [
+    "SAP.DE/EUR"
+   ]
+  },
+  "ETF_US": {
+   "id": "ETF_US",
+   "parent": "X",
+   "instruments": [
+    "SPY.US/USD"
+   ]
+  },
+  "VCCY": {
+   "id": "VCCY",
+   "parent": "X",
+   "instruments": [
+    "BTC/USD"
+   ]
+  }
+ }
+}

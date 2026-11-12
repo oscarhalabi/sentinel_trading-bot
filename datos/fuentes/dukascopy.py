@@ -1,7 +1,9 @@
 """Fuente Dukascopy: ticks de un día UTC (24 archivos .bi5 por hora)."""
 from __future__ import annotations
 
+import json
 import lzma
+import math
 import struct
 import threading
 import time
@@ -70,6 +72,98 @@ def escala_razonable(sim: Simbolo, tabla: pa.Table) -> str | None:
     return None
 
 
+# formato provisional: verificar con la respuesta real en la laptop (Task 11 Step 3)
+URL_INSTRUMENTOS = ("https://freeserv.dukascopy.com/2.0/index.php"
+                    "?path=common%2Finstruments&jsonp=_callbacks____1")
+CABECERAS_INSTRUMENTOS = {"Referer": "https://freeserv.dukascopy.com/"}
+
+# formato provisional: verificar con la respuesta real en la laptop (Task 11 Step 3)
+# id de grupo de Dukascopy -> clase nuestra. El horario sale después de la clase y la divisa.
+MAPEO_GRUPOS: dict[str, str] = {
+    "FX_MAJORS": "fx_mayor",
+    "FX_CROSSES": "fx_cruce",
+    "FX_EXOTICS": "fx_exotico",
+    "FX_METALS": "metal",
+    "CFD_INDICES": "indice",
+    "CFD_COMMODITIES": "materia_prima",
+    "VCCY": "cripto",
+}
+_ENERGIA = {"LIGHTCMDUSD", "BRENTCMDUSD"}
+
+
+def _clase_de_grupo(grupo: str) -> str | None:
+    """Clase de un grupo; las acciones y ETF se reconocen por el id."""
+    if grupo in MAPEO_GRUPOS:
+        return MAPEO_GRUPOS[grupo]
+    g = grupo.upper()
+    if "ETF" in g:
+        return "etf"
+    if g.startswith("STCK") or "STOCK" in g:
+        return "accion"
+    if "CRYPTO" in g:
+        return "cripto"
+    return None
+
+
+def _clase(grupos: list[str], codigo: str) -> str | None:
+    for g in grupos:
+        clase = _clase_de_grupo(g)
+        if clase == "materia_prima" and (codigo in _ENERGIA or codigo.startswith("GAS")):
+            return "energia"
+        if clase:
+            return clase
+    return None
+
+
+def _parsear_con_descartes(cuerpo: bytes) -> tuple[list[InstrumentoFuente], int]:
+    """Convierte la respuesta de la lista de instrumentos (JSONP o JSON).
+
+    Devuelve (instrumentos, cuántos quedaron sin clase). Nunca falla por un instrumento raro.
+    formato provisional: verificar con la respuesta real en la laptop (Task 11 Step 3).
+    """
+    texto = cuerpo.decode("utf-8", errors="replace").strip()
+    if not texto.startswith("{"):
+        ini, fin = texto.find("("), texto.rfind(")")
+        if ini < 0 or fin < ini:
+            raise ValueError("Respuesta de instrumentos no es JSON ni JSONP")
+        texto = texto[ini + 1:fin]
+    datos = json.loads(texto)
+    crudos = datos.get("instruments") or {}
+    grupos_de: dict[str, list[str]] = {}
+    for gid, g in (datos.get("groups") or {}).items():
+        for nombre in (g.get("instruments") or []):
+            grupos_de.setdefault(nombre, []).append(g.get("id", gid))
+    resultado: list[InstrumentoFuente] = []
+    sin_clase = 0
+    for clave, c in crudos.items():
+        try:
+            codigo = c["historical_filename"]
+            divisa = c.get("quote_currency") or ""
+            pip = float(c["pipValue"])
+            decimales = round(-math.log10(pip)) + 1
+            clase = _clase(grupos_de.get(clave, []), codigo)
+        except (KeyError, TypeError, ValueError):
+            sin_clase += 1
+            continue
+        if clase is None or not divisa or not 0 <= decimales <= 8:
+            sin_clase += 1
+            continue
+        inicio = None
+        try:
+            inicio = datetime.fromtimestamp(int(c["history_start_tick"]) / 1000,
+                                            tz=timezone.utc).date()
+        except (KeyError, TypeError, ValueError, OverflowError, OSError):
+            pass
+        resultado.append(InstrumentoFuente(codigo, c.get("name") or clave, clase,
+                                           decimales, divisa, inicio))
+    return resultado, sin_clase
+
+
+def parsear_instrumentos(cuerpo: bytes) -> list[InstrumentoFuente]:
+    """Igual que `_parsear_con_descartes` pero solo devuelve los instrumentos."""
+    return _parsear_con_descartes(cuerpo)[0]
+
+
 class _Limitador:
     """Deja pasar como máximo `por_segundo` peticiones por segundo entre todos los hilos."""
 
@@ -90,6 +184,7 @@ class _Limitador:
 
 class Dukascopy:
     nombre = "dukascopy"
+    sin_clase = 0  # instrumentos descartados en el último listado
 
     def __init__(self, http: ClienteHttp | None = None, max_paralelo: int = 4,
                  max_por_segundo: float = 20.0, reintentos: int = 4, espera_base: float = 1.0,
@@ -102,7 +197,12 @@ class Dukascopy:
         self._limitador = _Limitador(max_por_segundo, dormir)
 
     def listar_instrumentos(self) -> list[InstrumentoFuente]:
-        raise NotImplementedError("El listado de instrumentos de Dukascopy se hace en la tarea 5.")
+        """Pide la lista pública de instrumentos. Lanza RuntimeError si la respuesta no sirve."""
+        estado, cuerpo = self._http.get(URL_INSTRUMENTOS, 30.0, CABECERAS_INSTRUMENTOS)
+        if estado != 200:
+            raise RuntimeError(f"Lista de instrumentos: HTTP {estado}")
+        instrumentos, self.sin_clase = _parsear_con_descartes(cuerpo)
+        return instrumentos
 
     def _bajar_hora(self, codigo: str, hora: datetime, decimales: int) -> pa.Table:
         """Baja una hora con reintentos. Lanza RuntimeError con el motivo si no se logra."""

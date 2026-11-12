@@ -11,7 +11,8 @@ from datos.simbolos import Simbolo
 
 
 class ClienteHttp(Protocol):
-    def get(self, url: str, timeout: float) -> tuple[int, bytes]: ...
+    def get(self, url: str, timeout: float,
+            headers: dict[str, str] | None = None) -> tuple[int, bytes]: ...
 
 
 class ClienteRequests:
@@ -22,8 +23,9 @@ class ClienteRequests:
         self._sesion = requests.Session()
         self._sesion.headers["User-Agent"] = "sentinel-datos/1.0"
 
-    def get(self, url: str, timeout: float) -> tuple[int, bytes]:
-        r = self._sesion.get(url, timeout=timeout)
+    def get(self, url: str, timeout: float,
+            headers: dict[str, str] | None = None) -> tuple[int, bytes]:
+        r = self._sesion.get(url, timeout=timeout, headers=headers)
         return r.status_code, r.content
 
 
