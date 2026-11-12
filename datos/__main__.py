@@ -123,7 +123,8 @@ def _bajar(args, fuente, ruta, config) -> int:
         elegidos = [s for s in elegidos if s.simbolo in args.simbolo]
     if args.prioridad:
         elegidos = [s for s in elegidos if s.prioridad == args.prioridad]
-    fuente = fuente if fuente is not None else Dukascopy()
+    fuente = fuente if fuente is not None else Dukascopy(
+        max_paralelo=cfg.dukas_max_paralelo, max_por_segundo=cfg.dukas_max_por_segundo)
     cat = None
     if cfg.pg_dsn:
         try:

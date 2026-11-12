@@ -97,3 +97,15 @@ def test_cli_todas_las_ordenes_estan_conectadas():
     # Ninguna orden cae ya en el aviso de "aún no disponible".
     assert "Orden aún no disponible" not in (RAIZ / "datos" / "__main__.py").read_text(
         encoding="utf-8")
+
+
+def test_ritmo_dukascopy(tmp_path):
+    cfg = cargar_config({"DATA_DIR": str(tmp_path)})
+    assert (cfg.dukas_max_paralelo, cfg.dukas_max_por_segundo) == (4, 20.0)
+    cfg = cargar_config({"DATA_DIR": str(tmp_path), "DUKAS_MAX_PARALELO": "1",
+                         "DUKAS_MAX_POR_SEGUNDO": "0.5"})
+    assert (cfg.dukas_max_paralelo, cfg.dukas_max_por_segundo) == (1, 0.5)
+    for malo in ({"DUKAS_MAX_PARALELO": "0"}, {"DUKAS_MAX_PARALELO": "dos"},
+                 {"DUKAS_MAX_POR_SEGUNDO": "0"}, {"DUKAS_MAX_POR_SEGUNDO": "x"}):
+        with pytest.raises(ConfigInvalida):
+            cargar_config({"DATA_DIR": str(tmp_path), **malo})
