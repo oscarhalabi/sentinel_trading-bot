@@ -116,8 +116,11 @@ def ordenar_para_descarga(simbolos: dict[str, Simbolo]) -> list[Simbolo]:
 _INDICES_CANONICOS = {
     "USA500IDXUSD": "US500", "USATECHIDXUSD": "US100", "USA30IDXUSD": "US30",
     "DEUIDXEUR": "DE40", "GBRIDXGBP": "UK100", "JPNIDXJPY": "JP225",
+    "DOLLARIDXUSD": "DXY", "VOLIDXUSD": "VIX",
 }
 _ENERGIA_CANONICA = {"LIGHTCMDUSD": "WTI", "BRENTCMDUSD": "BRENT"}
+# Empresas que cambiaron de ticker y Dukascopy aún lista con el viejo (comprobado 2026-11-12).
+_RENOMBRADOS = {"FBUSUSD": "META.US"}
 
 
 def _horario_de(inst) -> str:
@@ -135,6 +138,8 @@ def _horario_de(inst) -> str:
 
 def nombre_canonico(inst) -> str:
     """Nombre propio del símbolo: divisas y metales tal cual, acciones <TICKER>.<PAÍS>."""
+    if inst.codigo in _RENOMBRADOS:
+        return _RENOMBRADOS[inst.codigo]
     if inst.clase in ("accion", "etf"):
         ticker = inst.nombre.split("/")[0].strip()
         if "." in ticker:
@@ -171,10 +176,12 @@ def fusionar_descubiertos(actuales: dict[str, Simbolo], descubiertos: list,
                   "fuentes": {**actual.fuentes, fuente: inst.codigo}}
         campos = {k: v for k, v in campos.items() if k not in actual.ajustado_a_mano}
         nuevo[nombre] = replace(actual, **campos)
+    # Se mira el registro ya fusionado: si un símbolo cambió de código en la fuente (alias de
+    # _RENOMBRADOS), su código nuevo sí está en la lista y no cuenta como desaparecido.
     desaparecidos = sorted(
-        n for n, s in actuales.items()
-        if fuente in s.fuentes and s.fuentes[fuente] not in codigos_crudos and s.activo
-        and "activo" not in s.ajustado_a_mano)
+        n for n in actuales
+        if fuente in (s := nuevo[n]).fuentes and s.fuentes[fuente] not in codigos_crudos
+        and s.activo and "activo" not in s.ajustado_a_mano)
     for n in desaparecidos:
         nuevo[n] = replace(nuevo[n], activo=False)
     return nuevo, sorted(nuevos), desaparecidos

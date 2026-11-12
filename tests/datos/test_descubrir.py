@@ -24,17 +24,22 @@ def _sim(nombre="XAUUSD", **kw):
 
 
 def test_parsea_instrumentos():
-    # formato provisional: verificar con la respuesta real en la laptop (Task 11 Step 3)
+    # La muestra es un recorte de la respuesta real de Dukascopy (2026-11-12).
     r = {i.codigo: i for i in parsear_instrumentos(MUESTRA.read_bytes())}
     assert (r["EURUSD"].clase, r["EURUSD"].decimales, r["EURUSD"].divisa) == ("fx_mayor", 5, "USD")
+    assert r["EURGBP"].clase == "fx_cruce" and r["USDTRY"].clase == "fx_exotico"
     assert (r["XAUUSD"].clase, r["XAUUSD"].decimales) == ("metal", 3)
+    assert r["XPTCMDUSD"].clase == "metal"
     assert (r["USA500IDXUSD"].clase, r["USA500IDXUSD"].decimales) == ("indice", 3)
+    assert r["DEUIDXEUR"].clase == "indice" and r["JPNIDXJPY"].divisa == "JPY"
     assert (r["NVDAUSUSD"].clase, r["NVDAUSUSD"].decimales) == ("accion", 3)
+    assert r["SAPDEEUR"].clase == "accion"
     assert r["SPYUSUSD"].clase == "etf"
     assert (r["BTCUSD"].clase, r["BTCUSD"].decimales) == ("cripto", 1)
     assert r["LIGHTCMDUSD"].clase == "energia" and r["COPPERCMDUSD"].clase == "materia_prima"
-    assert r["NVDAUSUSD"].inicio == date(2017, 7, 14)
-    assert "RAROUSD" not in r  # sin grupo: se descarta
+    assert r["NVDAUSUSD"].inicio == date(2017, 3, 1)
+    assert "BUNDTREUR" not in r  # bono: no tenemos clase para él
+    assert None not in r  # DUK+/EUR no tiene archivo histórico
 
 
 def test_acepta_jsonp():
@@ -47,6 +52,8 @@ def test_nombre_canonico():
     assert nombre_canonico(_inst("USA500IDXUSD", clase="indice")) == "US500"
     assert nombre_canonico(_inst("EURUSD", "EUR/USD", "fx_mayor")) == "EURUSD"
     assert nombre_canonico(_inst("LIGHTCMDUSD", clase="energia")) == "WTI"
+    assert nombre_canonico(_inst("FBUSUSD", "FB.US/USD", "accion")) == "META.US"
+    assert nombre_canonico(_inst("DOLLARIDXUSD", clase="indice")) == "DXY"
 
 
 def test_descubrir_no_pisa_ajustes_manuales():
@@ -91,7 +98,8 @@ def test_listar_instrumentos_usa_referer():
     d = Dukascopy(http=http)
     assert d.listar_instrumentos()
     assert http.cabeceras and "Referer" in http.cabeceras
-    assert d.sin_clase == 1
+    assert d.sin_clase == 2  # el bono y DUK+/EUR
+    assert "BUNDTREUR" in d.codigos_crudos
 
 
 def _registro_chico(ruta, inactivos=()):
@@ -178,7 +186,18 @@ def test_cli_guardia_20_por_ciento(tmp_path, capsys):
     ruta = tmp_path / "simbolos.json"
     shutil.copy(RUTA_REGISTRO, ruta)
     antes = ruta.read_bytes()
-    d = Dukascopy(http=_HttpFalso(MUESTRA.read_bytes()))  # solo 15 de 39 símbolos
+    d = Dukascopy(http=_HttpFalso(MUESTRA.read_bytes()))  # solo una parte del registro
     assert main(["simbolos", "descubrir", "--aplicar"], fuente=d, ruta=ruta) == 1
     assert ruta.read_bytes() == antes
     assert "20 %" in capsys.readouterr().err
+
+
+def test_ticker_renombrado_no_desaparece():
+    # Dukascopy lista Meta como FB.US (FBUSUSD); nuestro registro lo llama META.US.
+    actuales = {"META.US": _sim("META.US", clase="accion", fuentes={"dukascopy": "METAUSUSD"},
+                                horario="accion_us", ajustado_a_mano=("prioridad",))}
+    nuevo, nuevos, desap = fusionar_descubiertos(
+        actuales, [_inst("FBUSUSD", "FB.US/USD", "accion")], "dukascopy",
+        codigos_crudos={"FBUSUSD"})
+    assert desap == [] and nuevos == []
+    assert nuevo["META.US"].fuentes == {"dukascopy": "FBUSUSD"} and nuevo["META.US"].activo

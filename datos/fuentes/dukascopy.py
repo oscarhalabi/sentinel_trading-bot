@@ -72,45 +72,52 @@ def escala_razonable(sim: Simbolo, tabla: pa.Table) -> str | None:
     return None
 
 
-# formato provisional: verificar con la respuesta real en la laptop (Task 11 Step 3)
+# Lista pública de instrumentos (comprobada con la respuesta real el 2026-11-12: JSONP de
+# ~1 MB, ~1600 instrumentos). Funciona con este Referer y un User-Agent genérico.
 URL_INSTRUMENTOS = ("https://freeserv.dukascopy.com/2.0/index.php"
                     "?path=common%2Finstruments&jsonp=_callbacks____1")
 CABECERAS_INSTRUMENTOS = {"Referer": "https://freeserv.dukascopy.com/"}
 
-# formato provisional: verificar con la respuesta real en la laptop (Task 11 Step 3)
-# id de grupo de Dukascopy -> clase nuestra. El horario sale después de la clase y la divisa.
+# id de grupo de Dukascopy -> clase nuestra. Los grupos cuelgan unos de otros (`parent`):
+# las acciones van por país ("US", "Germany"...) bajo STCK_CFD, los ETF bajo ETF_CFD y los
+# índices bajo IDX. Se busca el grupo del instrumento y, si no está aquí, sus padres.
+# Los bonos (BND_CFD) no tienen clase nuestra: se descartan. El horario sale de la clase y la divisa.
 MAPEO_GRUPOS: dict[str, str] = {
     "FX_MAJORS": "fx_mayor",
-    "FX_CROSSES": "fx_cruce",
-    "FX_EXOTICS": "fx_exotico",
-    "FX_METALS": "metal",
-    "CFD_INDICES": "indice",
-    "CFD_COMMODITIES": "materia_prima",
+    "FX_CROSSES": "fx_cruce",   # incluye los exóticos; se separan con _G10
+    "FX_METALS": "metal",       # oro y plata contra muchas divisas
+    "CMD_METALS": "materia_prima",  # cobre; platino y paladio pasan a metal con _METALES
+    "CMD_ENERGY": "energia",
+    "CMD_AGRICULTURAL": "materia_prima",
+    "IDX": "indice",
+    "STCK_CFD": "accion",
+    "ETF_CFD": "etf",
     "VCCY": "cripto",
 }
-_ENERGIA = {"LIGHTCMDUSD", "BRENTCMDUSD"}
+_G10 = {"USD", "EUR", "JPY", "GBP", "CHF", "AUD", "NZD", "CAD", "NOK", "SEK"}
+_METALES = {"XPTCMDUSD", "XPDCMDUSD"}
 
 
-def _clase_de_grupo(grupo: str) -> str | None:
-    """Clase de un grupo; las acciones y ETF se reconocen por el id."""
-    if grupo in MAPEO_GRUPOS:
-        return MAPEO_GRUPOS[grupo]
-    g = grupo.upper()
-    if "ETF" in g:
-        return "etf"
-    if g.startswith("STCK") or "STOCK" in g:
-        return "accion"
-    if "CRYPTO" in g:
-        return "cripto"
-    return None
+def _cadena(grupo: str, padres: dict[str, str]) -> list[str]:
+    """El grupo y todos sus padres, del más concreto al más general."""
+    cadena: list[str] = []
+    while grupo and grupo not in cadena:
+        cadena.append(grupo)
+        grupo = padres.get(grupo, "")
+    return cadena
 
 
-def _clase(grupos: list[str], codigo: str) -> str | None:
+def _clase(grupos: list[str], padres: dict[str, str], codigo: str,
+           base: str, divisa: str) -> str | None:
     for g in grupos:
-        clase = _clase_de_grupo(g)
-        if clase == "materia_prima" and (codigo in _ENERGIA or codigo.startswith("GAS")):
-            return "energia"
-        if clase:
+        for eslabon in _cadena(g, padres):
+            clase = MAPEO_GRUPOS.get(eslabon)
+            if clase is None:
+                continue
+            if clase == "fx_cruce" and not {base, divisa} <= _G10:
+                return "fx_exotico"
+            if codigo in _METALES:
+                return "metal"
             return clase
     return None
 
@@ -120,7 +127,6 @@ def _parsear_con_descartes(cuerpo: bytes) -> tuple[list[InstrumentoFuente], int,
 
     Devuelve (instrumentos, cuántos quedaron sin clase, códigos crudos de TODOS los
     instrumentos de la lista, aunque se hayan descartado). Nunca falla por un instrumento raro.
-    formato provisional: verificar con la respuesta real en la laptop (Task 11 Step 3).
     """
     texto = cuerpo.decode("utf-8", errors="replace").strip()
     if not texto.startswith("{"):
@@ -131,20 +137,28 @@ def _parsear_con_descartes(cuerpo: bytes) -> tuple[list[InstrumentoFuente], int,
     datos = json.loads(texto)
     crudos = datos.get("instruments") or {}
     grupos_de: dict[str, list[str]] = {}
+    padres: dict[str, str] = {}
     for gid, g in (datos.get("groups") or {}).items():
+        gid = g.get("id", gid)
+        if g.get("parent"):
+            padres[gid] = g["parent"]
         for nombre in (g.get("instruments") or []):
-            grupos_de.setdefault(nombre, []).append(g.get("id", gid))
+            grupos_de.setdefault(nombre, []).append(gid)
     resultado: list[InstrumentoFuente] = []
     sin_clase = 0
     codigos: set[str] = set()
     for clave, c in crudos.items():
         try:
             codigo = c["historical_filename"]
+            if not codigo:  # hay alguno sin archivo histórico (p. ej. DUK+/EUR)
+                sin_clase += 1
+                continue
             codigos.add(codigo)
             divisa = c.get("quote_currency") or ""
             pip = float(c["pipValue"])
             decimales = round(-math.log10(pip)) + 1
-            clase = _clase(grupos_de.get(clave, []), codigo)
+            clase = _clase(grupos_de.get(clave, []), padres, codigo,
+                           c.get("base_currency") or "", divisa)
         except (KeyError, TypeError, ValueError):
             sin_clase += 1
             continue
