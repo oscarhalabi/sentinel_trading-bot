@@ -38,6 +38,11 @@ def construir_parser() -> argparse.ArgumentParser:
                             help="Solo estos símbolos (nombre canónico)")
             sp.add_argument("--desde", type=date.fromisoformat,
                             help="Solo meses desde esta fecha (AAAA-MM-DD)")
+        if nombre == "verificar":
+            sp.add_argument("--simbolo", nargs="+", action="extend", default=[],
+                            help="Solo estos símbolos (nombre canónico)")
+            sp.add_argument("--desde", type=date.fromisoformat,
+                            help="Solo días desde esta fecha (AAAA-MM-DD)")
         if nombre == "catalogo":
             csub = sp.add_subparsers(dest="accion", metavar="accion")
             csub.add_parser("migrar", help="Crea o actualiza las tablas del catálogo")
@@ -149,6 +154,57 @@ def _velas(args, config) -> int:
     return 0
 
 
+def _faltantes(cat, simbolos) -> dict[str, int]:
+    """Días de ticks sin bajar por símbolo, según el catálogo."""
+    from datos.catalogo import dias_pendientes
+
+    nombres = {s.simbolo for s in simbolos}
+    faltan: dict[str, int] = {}
+    for sim, fuente, tipo, _ok, _vacio, _error, inicio, _pmin, _pmax in cat.resumen_estado():
+        if tipo != "ticks" or sim not in nombres or not inicio:
+            continue
+        hechos = cat.estados(tipo, fuente, sim)
+        n = sum(1 for d in dias_pendientes(hechos, inicio, date.today()) if d not in hechos)
+        faltan[sim] = faltan.get(sim, 0) + n
+    return faltan
+
+
+def _verificar(args, ruta, config) -> int:
+    from datos import simbolos as sim
+    from datos.calidad import escribir_informe, verificar
+    from datos.catalogo import Catalogo
+    from datos.config import cargar_config
+
+    registro = sim.cargar(ruta if ruta is not None else sim.RUTA_REGISTRO)
+    cfg = config if config is not None else cargar_config()
+    desconocidos = [n for n in args.simbolo if n not in registro]
+    if desconocidos:
+        print(f"Símbolo desconocido: {', '.join(desconocidos)}", file=sys.stderr)
+        return 2
+    elegidos = [s for s in registro.values() if s.activo
+                and (not args.simbolo or s.simbolo in args.simbolo)]
+    cat = None
+    if cfg.pg_dsn:
+        try:
+            cat = Catalogo(cfg.pg_dsn)
+        except Exception as e:  # el mensaje de psycopg2 puede traer el DSN: no se imprime
+            print(f"No se pudo conectar al Postgres del catálogo ({type(e).__name__}). "
+                  "No se verifica nada.", file=sys.stderr)
+            return 1
+    try:
+        problemas = verificar(cfg, elegidos, cat, desde=args.desde)
+        resumen = {"faltantes": _faltantes(cat, elegidos)} if cat else None
+    finally:
+        if cat:
+            cat.cerrar()
+    informe = escribir_informe(cfg, problemas, resumen)
+    graves = [p for p in problemas if p.gravedad == "grave"]
+    print(f"Símbolos revisados: {len(elegidos)}")
+    print(f"Problemas nuevos: {len(problemas)} (graves: {len(graves)})")
+    print(f"Informe: {informe}")
+    return 1 if graves else 0
+
+
 def _catalogo(accion: str, config=None) -> int:
     from datetime import date
 
@@ -199,12 +255,14 @@ def main(argv: list[str] | None = None, fuente=None, ruta=None, config=None) -> 
         return _bajar(args, fuente, ruta, config)
     if args.orden == "velas":
         return _velas(args, config)
+    if args.orden == "verificar":
+        return _verificar(args, ruta, config)
     if args.orden == "catalogo":
         if getattr(args, "accion", None) is None:
             print("Falta la acción: migrar, reconstruir o estado.", file=sys.stderr)
             return 2
         return _catalogo(args.accion)
-    print("Orden aún no disponible", file=sys.stderr)
+    print("Falta indicar la acción de la orden (usa --help).", file=sys.stderr)
     return 2
 
 

@@ -87,8 +87,13 @@ def test_cli_lista_ordenes():
         assert orden in r.stdout
 
 
-def test_cli_orden_no_disponible():
-    r = subprocess.run([sys.executable, "-m", "datos", "verificar"], cwd=RAIZ,
-                       capture_output=True, text=True)
-    assert r.returncode == 2
-    assert "Orden aún no disponible" in r.stderr
+def test_cli_todas_las_ordenes_estan_conectadas():
+    from datos.__main__ import ORDENES
+    assert len(ORDENES) == 5
+    for orden in ORDENES:
+        r = subprocess.run([sys.executable, "-m", "datos", orden, "--help"], cwd=RAIZ,
+                           capture_output=True, text=True)
+        assert r.returncode == 0, orden
+    # Ninguna orden cae ya en el aviso de "aún no disponible".
+    assert "Orden aún no disponible" not in (RAIZ / "datos" / "__main__.py").read_text(
+        encoding="utf-8")
