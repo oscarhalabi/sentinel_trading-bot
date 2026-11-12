@@ -1,34 +1,52 @@
 ---
 name: fase2-datos-decisiones
-description: Decisiones del brainstorming de la Fase 2 (datos históricos, 2026-11-12) — fuentes, almacén, máquinas, universo, calendario, tipo de cuenta — y pendientes
+description: Decisiones de la Fase 2 (datos históricos, 2026-11-12, rehecha con superpowers) — subproyectos 2A–2E, universo con ticks para todo, laptop de investigación, sin ver el futuro, reserva de 12 meses; pendientes
 metadata:
   type: project
 ---
 
-Diseño: `docs/superpowers/specs/2026-11-12-fase2-datos-historicos-design.md`.
-Plan: `docs/superpowers/plans/2026-11-12-fase2-datos-historicos.md`. Rama del diseño: `fase2/datos-historicos`.
+Mapa de la fase: `docs/superpowers/specs/2026-11-12-fase2-datos-historicos-design.md`.
+Spec de 2A: `docs/superpowers/specs/2026-11-12-fase2a-nucleo-datos-design.md`.
+Rama `fase2/datos-historicos`, PR oscarhalabi/sentinel_trading-bot#3.
 
-## Decisiones de Oscar (2026-11-12)
+## Decisiones (Oscar, 2026-11-12)
 
-- **Resolución:** todos los estilos, scalping incluido, así que se guardan **ticks bid/ask**; las velas M1 salen de los ticks y las temporalidades mayores se calculan al vuelo.
-- **Fuentes de precio:** Vantage MT5 (lo reciente y lo que llegue en adelante) + Dukascopy (historia larga, gratis). Queda un hueco para futuros de pago (GC del CME...) si la Fase 3 los pide.
-- **Almacén:** Parquet + DuckDB; catálogo en Postgres (`sentinel_datos`, en el PC), reconstruible desde los manifiestos. **Varios pares desde el principio** (Oscar no quiere depender de uno solo).
-- **Máquina de investigación:** el **PC de Oscar con Windows** (1 TB o más de SSD). El VPS solo captura Vantage. (La sesión de Claude en la nube es temporal y no sirve para guardar datos.)
-- **Traspaso y respaldo:** bucket Cloudflare R2 (unos 6 USD/mes con 400 GB). Se respalda todo.
-- **Contexto:** calendario histórico (API de pago, se elige tras probar; unos 20–30 USD/mes) + foto diaria del JSON de Forex Factory; FRED con fechas de publicación; mercados relacionados; COT y GLD.
-- **Universo:** lo más amplio posible: unos 30 símbolos (metales, 7 mayores, 12 cruces, 6 índices, WTI/Brent, DXY).
-- **Captura VPS:** clon propio `C:\MT5_instances_n1\mt5_datos` con una demo RAW nueva (la crea Daniel), tarea `SentinelN1Datos` cada hora que no se queda corriendo. Sin Supabase.
-- **RAW o Standard:** Oscar creía que RAW era un "costo fijo de una vez". Se le aclaró que es una **comisión por lote** con spread casi nulo. Se decidió **medirlo**: un clon Standard opcional para que la Fase 4 compare los costos con spreads reales.
-- **Hora:** todo en UTC; la regla de Vantage (GMT+2/+3) se confirma con un desfase 0 frente a Dukascopy.
+- **Brainstorming rehecho con superpowers** (pedido de Oscar). La Fase 2 se partió en
+  subproyectos con su propia spec, plan y PR: 2A núcleo (laptop), 2B Vantage + R2, 2C contexto,
+  2D mantenimiento y 2E libro de órdenes.
+- **Universo "todo lo posible"** (acciones como NVDA, ETFs y cripto incluidos), con **ticks para
+  todo**, también para lo que Vantage no ofrece hoy. La prioridad 1 (lo operable en Vantage)
+  solo decide el orden de descarga. Supabase no se usa para guardar mercado.
+- **Máquina:** el bot en el VPS; los datos y la simulación en la **laptop de Oscar**, con su clon
+  en `C:\Users\oscar\code\sentinel_trading-bot` y Python + Postgres instalados (2026-11-12).
+- **Sin ver el futuro:** las velas llevan `ts_cierre`; las uniones entre mercados se hacen sobre él.
+- **Reserva de 12 meses con corte móvil**; acceder exige `incluir_reservado=True` y queda anotado.
+- **Descargador propio** de Dukascopy (frente a una librería de terceros o comprar un histórico).
+- **Sumar ventajas pequeñas:** no se descarta una estrategia por rendir poco si suma sin moverse
+  igual que las demás.
+- **Rentabilidad:** aspiración de ~200 % mensual con días buenos de ~10 % (Oscar bajó desde el
+  "10 % diario"). Se le advirtió que está muy por encima de lo sostenible; el laboratorio medirá
+  con costos, drawdown y probabilidad de ruina, sin martingalas.
+- **Proyección como un trader humano** y **librería única de indicadores** (la misma en el
+  laboratorio y en el bot): Fases 3–5.
+- **Biblioteca científica** (papers y libros serios): primer bloque de la Fase 3.
+- **Libro de órdenes:** MT5/Vantage no tiene uno central para el oro y las divisas. Las fuentes
+  reales (CME, Nasdaq, Binance) se evalúan en 2E.
+- **MiroFish:** no se fuerza (ver [[mirofish-evaluacion]]).
+- **Vantage para datos:** demo 26415345, creada por Oscar (falta confirmar que es RAW y su
+  servidor). Las demos se cierran por inactividad (~2 meses, según Oscar); para 2B se prefiere
+  una **cuenta real mínima** solo para datos.
+- **R2:** en la cuenta de Cloudflare de Oscar, con dos buckets (`sentinel-datos` y
+  `sentinel-datos-vps`), porque las claves de R2 se limitan por bucket.
 
 ## Pendientes
 
-1. Revisión del PR del diseño por Oscar (y Daniel para lo del VPS).
-2. Task 0 del plan: Python y Postgres en el PC, cuenta R2 + clave FRED (Oscar), verificar los símbolos en cada fuente.
-3. **Demo de datos creada (2026-11-12, por Oscar): cuenta 26415345** en Vantage. Falta confirmar que es RAW
-   y su servidor; la clave no se anota aquí. Se usará con `provision clon-datos` (Task 7 / Task 13) en
-   `C:\MT5_instances_n1\mt5_datos`. La demo Standard opcional (7.10) sigue sin crear.
-4. R2 va en la cuenta de Cloudflare que ya tiene Oscar (buckets `sentinel-datos` y `sentinel-datos-vps`: en R2 las claves se limitan por bucket, no por carpeta).
-5. PR del diseño: oscarhalabi/sentinel_trading-bot#3 (2026-11-12). El 403 al crear PRs desde la nube se arregló cuando Oscar reconectó GitHub.
+1. Oscar revisa la spec de 2A; después, plan de 2A con superpowers:writing-plans.
+2. Claves de R2 y FRED en el `.env` de la laptop (se usan en 2B y 2C, no en 2A).
+3. El PR #3 lo abrió Claude cuando Oscar reconectó GitHub (antes daba 403). La rama
+   `claude/fase2-historical-data-xau-rp4wa5` no se pudo borrar desde la sesión: hay que borrarla en GitHub.
+4. Remote Control con la laptop: la carpeta aparece en la lista pero no se ofrece a las sesiones
+   en la nube (app de Windows). Mientras tanto, lo que exige la laptop se hace en una sesión local.
 
-**Cómo aplicar:** antes de implementar cualquier parte de `datos/`, leer el spec. Si un supuesto del spec resulta falso (profundidad, nombres, regla de hora), anotarlo aquí.
+**Cómo aplicar:** antes de tocar `datos/`, leer la spec del subproyecto. Si un supuesto resulta
+falso (URL de instrumentos, decimales, velocidad, tamaños), anotarlo aquí.

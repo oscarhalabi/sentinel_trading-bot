@@ -31,7 +31,11 @@ Revisión del código (commit del 2026-10-02):
 4. **AGPL:** usarlo como herramienta aparte está bien. Si se copia su código dentro de nuestro bot,
    el bot hereda la AGPL. Por eso: **instalarlo aparte, nunca mezclarlo con el repo**.
 
-## Cómo encaja (decisión propuesta, 2026-11-12)
+## Decisión de Oscar (2026-11-12)
+- **No se fuerza.** La idea era aprovechar sus piezas para un sandbox propio. Como es limitado (no
+  tiene nada de mercados), solo se retoma si en la Fase 3 aparece una pieza concreta que valga la pena.
+
+## Cómo encajaría si se retoma
 - **Fase 2: nada que integrar.** Solo hay que asegurarse de que el calendario y los precios
   tengan `ts` UTC fiable, que es lo que necesitará la evaluación.
 - **Fase 3: experimento acotado, aparte** (su propia carpeta o Docker en el PC de Oscar). Antes de

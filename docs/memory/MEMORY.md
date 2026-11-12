@@ -2,8 +2,8 @@
 - [Fork desde cero](fork-fresh-start.md) — 2026-10-28: se reconstruye la estrategia desde cero; qué se conserva/descarta, orden de las 5 fases; no usar conclusiones de exp-2
 - [Decisiones de la Fase 1](fork-fase1-decisiones.md) — motor/, registro de motores, aislamiento de producción, vigilante, altas a mano, migración n1_001 (aplicada 2026-11-02) y pendientes de Oscar
 - [Checkpoint Fase 1 (2026-11-03)](estado-fase1-checkpoint.md) — qué cuentas corren (correo ↔ cuenta ↔ bot), prueba punta a punta (Fase 1 cerrada) y próximos pasos
-- [Decisiones de la Fase 2 (datos)](fase2-datos-decisiones.md) — 2026-11-12: ticks bid/ask, Vantage + Dukascopy, Parquet + DuckDB + catálogo Postgres en el PC de Oscar, R2, ~30 símbolos, contexto; pendientes
-- [Evaluación de MiroFish](mirofish-evaluacion.md) — 2026-11-12: simulador de opinión en redes con agentes LLM (no de mercados); AGPL; solo probable hacia delante; experimento acotado en Fase 3
+- [Decisiones de la Fase 2 (datos)](fase2-datos-decisiones.md) — 2026-11-12 (rehecha con superpowers): subproyectos 2A–2E, ticks de todo lo posible, laptop de Oscar, sin ver el futuro, reserva de 12 meses; pendientes
+- [Evaluación de MiroFish](mirofish-evaluacion.md) — 2026-11-12: simulador de opinión en redes con agentes LLM (no de mercados); AGPL; solo probable hacia delante; no se fuerza
 - [Equipo y flujo git](equipo-y-flujo-git.md) — Oscar (estrategia/análisis) y Daniel (app web/servidor); ramas, PR, revisión cruzada, tags, identidad por commit
 
 ## Infraestructura heredada (describen el bot de producción exp-1/e2; la mecánica sigue valiendo)
