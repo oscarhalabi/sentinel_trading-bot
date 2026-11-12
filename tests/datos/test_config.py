@@ -88,7 +88,7 @@ def test_cli_lista_ordenes():
 
 
 def test_cli_orden_no_disponible():
-    r = subprocess.run([sys.executable, "-m", "datos", "bajar"], cwd=RAIZ,
+    r = subprocess.run([sys.executable, "-m", "datos", "verificar"], cwd=RAIZ,
                        capture_output=True, text=True)
     assert r.returncode == 2
     assert "Orden aún no disponible" in r.stderr

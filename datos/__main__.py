@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from datetime import date
 
 ORDENES = {
     "simbolos": "Lista los símbolos disponibles",
@@ -24,6 +25,14 @@ def construir_parser() -> argparse.ArgumentParser:
             d = ssub.add_parser("descubrir", help="Busca instrumentos nuevos en Dukascopy")
             d.add_argument("--aplicar", action="store_true",
                            help="Guarda los cambios (sin esto solo muestra el resumen)")
+        if nombre == "bajar":
+            sp.add_argument("--simbolo", nargs="+", action="extend", default=[],
+                            help="Solo estos símbolos (nombre canónico)")
+            sp.add_argument("--prioridad", type=int, choices=(1, 2),
+                            help="Solo los símbolos de esta prioridad")
+            sp.add_argument("--desde", type=date.fromisoformat, help="Primer día (AAAA-MM-DD)")
+            sp.add_argument("--hasta", type=date.fromisoformat, help="Último día (AAAA-MM-DD)")
+            sp.add_argument("--max-horas", type=float, help="Se detiene tras estas horas")
         if nombre == "catalogo":
             csub = sp.add_subparsers(dest="accion", metavar="accion")
             csub.add_parser("migrar", help="Crea o actualiza las tablas del catálogo")
@@ -82,6 +91,48 @@ def _descubrir(aplicar: bool, fuente, ruta) -> int:
     return 0
 
 
+def _bajar(args, fuente, ruta, config) -> int:
+    from datos import simbolos as sim
+    from datos.catalogo import Catalogo
+    from datos.config import cargar_config
+    from datos.descarga import bajar, imprimir
+    from datos.fuentes.dukascopy import Dukascopy
+
+    registro = sim.cargar(ruta if ruta is not None else sim.RUTA_REGISTRO)
+    cfg = config if config is not None else cargar_config()
+    desconocidos = [n for n in args.simbolo if n not in registro]
+    if desconocidos:
+        print(f"Símbolo desconocido: {', '.join(desconocidos)}", file=sys.stderr)
+        return 2
+    elegidos = sim.ordenar_para_descarga(registro)
+    if args.simbolo:
+        inactivos = [n for n in args.simbolo if not registro[n].activo]
+        if inactivos:
+            print(f"Símbolo inactivo: {', '.join(inactivos)}", file=sys.stderr)
+            return 2
+        elegidos = [s for s in elegidos if s.simbolo in args.simbolo]
+    if args.prioridad:
+        elegidos = [s for s in elegidos if s.prioridad == args.prioridad]
+    fuente = fuente if fuente is not None else Dukascopy()
+    cat = None
+    if cfg.pg_dsn:
+        try:
+            cat = Catalogo(cfg.pg_dsn)
+            cat.sincronizar_simbolos(registro)
+        except Exception as e:  # el mensaje de psycopg2 puede traer el DSN: no se imprime
+            print(f"No se pudo conectar al Postgres del catálogo ({type(e).__name__}). "
+                  "No se descarga nada.", file=sys.stderr)
+            return 1
+    try:
+        res = bajar(cfg, elegidos, fuente, cat, desde=args.desde, hasta=args.hasta,
+                    max_horas=args.max_horas)
+    finally:
+        if cat:
+            cat.cerrar()
+    imprimir(res)
+    return 0 if res.dias_error == 0 and not res.simbolos_parados else 1
+
+
 def _catalogo(accion: str, config=None) -> int:
     from datetime import date
 
@@ -120,7 +171,7 @@ def _catalogo(accion: str, config=None) -> int:
     return 0
 
 
-def main(argv: list[str] | None = None, fuente=None, ruta=None) -> int:
+def main(argv: list[str] | None = None, fuente=None, ruta=None, config=None) -> int:
     p = construir_parser()
     args = p.parse_args(argv)
     if args.orden is None:
@@ -128,6 +179,8 @@ def main(argv: list[str] | None = None, fuente=None, ruta=None) -> int:
         return 2
     if args.orden == "simbolos" and getattr(args, "accion", None) == "descubrir":
         return _descubrir(args.aplicar, fuente, ruta)
+    if args.orden == "bajar":
+        return _bajar(args, fuente, ruta, config)
     if args.orden == "catalogo":
         if getattr(args, "accion", None) is None:
             print("Falta la acción: migrar, reconstruir o estado.", file=sys.stderr)
