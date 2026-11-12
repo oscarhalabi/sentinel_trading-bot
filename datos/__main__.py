@@ -33,6 +33,11 @@ def construir_parser() -> argparse.ArgumentParser:
             sp.add_argument("--desde", type=date.fromisoformat, help="Primer día (AAAA-MM-DD)")
             sp.add_argument("--hasta", type=date.fromisoformat, help="Último día (AAAA-MM-DD)")
             sp.add_argument("--max-horas", type=float, help="Se detiene tras estas horas")
+        if nombre == "velas":
+            sp.add_argument("--simbolo", nargs="+", action="extend", default=[],
+                            help="Solo estos símbolos (nombre canónico)")
+            sp.add_argument("--desde", type=date.fromisoformat,
+                            help="Solo meses desde esta fecha (AAAA-MM-DD)")
         if nombre == "catalogo":
             csub = sp.add_subparsers(dest="accion", metavar="accion")
             csub.add_parser("migrar", help="Crea o actualiza las tablas del catálogo")
@@ -134,6 +139,16 @@ def _bajar(args, fuente, ruta, config) -> int:
                  and res.parado_por != "disco") else 1
 
 
+def _velas(args, config) -> int:
+    from datos.config import cargar_config
+    from datos.velas import construir_m1
+
+    cfg = config if config is not None else cargar_config()
+    n = construir_m1(cfg, simbolos=args.simbolo or None, desde=args.desde)
+    print(f"Velas M1: {n} meses escritos.")
+    return 0
+
+
 def _catalogo(accion: str, config=None) -> int:
     from datetime import date
 
@@ -182,6 +197,8 @@ def main(argv: list[str] | None = None, fuente=None, ruta=None, config=None) -> 
         return _descubrir(args.aplicar, fuente, ruta)
     if args.orden == "bajar":
         return _bajar(args, fuente, ruta, config)
+    if args.orden == "velas":
+        return _velas(args, config)
     if args.orden == "catalogo":
         if getattr(args, "accion", None) is None:
             print("Falta la acción: migrar, reconstruir o estado.", file=sys.stderr)
