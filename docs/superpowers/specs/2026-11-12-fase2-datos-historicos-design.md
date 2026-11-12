@@ -303,9 +303,13 @@ tamaño, horario), que aún no existe. Por eso no se decide ahora: **se mide**.
 
 ### 7.11 Bucket en la nube (Cloudflare R2)
 
-- Un bucket privado (p. ej. `sentinel-datos`) con la misma estructura de carpetas que `DATA_DIR`.
-- El VPS **sube** lo suyo (`vantage_*`, foto de Forex Factory) con una clave que solo puede
-  escribir en esas carpetas. El PC **sube** lo suyo (Dukascopy, contexto) y **baja** lo del VPS.
+- Dos buckets privados en la cuenta de Cloudflare de Oscar, con la misma estructura de carpetas que
+  `DATA_DIR`. En R2 una clave se limita por bucket, no por carpeta; por eso son dos:
+  - `sentinel-datos-vps`: el VPS **sube** aquí lo suyo (`vantage_*`, foto de Forex Factory). Su
+    clave solo tiene permiso sobre este bucket.
+  - `sentinel-datos`: el respaldo completo. El PC **trae** lo del bucket del VPS, **sube** lo suyo
+    (Dukascopy, contexto) y copia aquí también lo de Vantage. Su clave tiene permiso sobre los dos.
+  Así, si se filtra la clave del VPS, no se puede borrar el respaldo.
 - `datos subir` y `datos traer` comparan manifiestos (hash), así que solo se transfiere lo nuevo o
   lo cambiado.
 - Costo: R2 cobra unos 0,015 USD por GB y mes, sin cargo por descarga. Con 400 GB, unos 6 USD/mes.

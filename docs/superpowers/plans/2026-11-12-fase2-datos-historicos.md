@@ -40,7 +40,7 @@
 - [ ] **Step 1 (PC, Oscar):** versión de Python instalada y si `pip install pyarrow duckdb` funciona en ella. Anotar la versión elegida.
 - [ ] **Step 2 (PC, Oscar):** instalar PostgreSQL en el PC si no está. Crear rol y bases `sentinel_datos` y `sentinel_datos_test`. Variables de usuario `DATOS_PG_DSN` y `DATOS_PG_DSN_TEST`. (Ojo con los signos en la clave: van codificados en el DSN, igual que en la Fase 1.)
 - [ ] **Step 3 (PC):** elegir `DATA_DIR` en el SSD (p. ej. `D:\sentinel_datos`) y comprobar el espacio libre.
-- [ ] **Step 4 (Oscar):** crear la cuenta de Cloudflare R2 y el bucket privado `sentinel-datos`, con dos claves de API: una para el PC (lectura y escritura) y otra para el VPS (solo escritura en `ticks/fuente=vantage_*`, `m1/fuente=vantage_*` y `contexto/calendario/fuente=forexfactory`). Pedir también una clave gratis de FRED.
+- [ ] **Step 4 (Oscar):** activar R2 en la cuenta de Cloudflare de Oscar y crear dos buckets privados, `sentinel-datos` (respaldo completo) y `sentinel-datos-vps` (lo que sube el VPS), con dos claves de API: la del PC (lectura y escritura en los dos) y la del VPS (lectura y escritura solo en `sentinel-datos-vps`). Pedir también una clave gratis de FRED.
 - [ ] **Step 5 (Daniel):** crear una demo **RAW** nueva en Vantage para datos (y, si se aprueba 7.10, una demo **Standard**). Confirmar la comisión por lote de RAW y anotarla.
 - [ ] **Step 6:** comprobar qué símbolos del universo existen en Dukascopy y desde qué fecha (una petición de prueba por símbolo a la primera hora disponible). Comprobar sus nombres en Vantage con `mt5.symbols_get()` (solo lectura, en el clon de datos cuando exista). Rellenar `datos/simbolos.json` con lo real.
 - [ ] **Step 7:** anotar todo en `docs/memory/fase2-datos-decisiones.md`.
@@ -169,7 +169,7 @@
 **Interfaces:**
 - `python -m datos subir [--prefijo ...]`: sube los archivos cuyo manifiesto no está en el bucket o tiene otro hash, y el manifiesto al final.
 - `python -m datos traer [--prefijo ...]`: baja lo que falta o cambió, verifica el hash, lo deja en `DATA_DIR` y lo registra en el catálogo.
-- Endpoint R2 y claves desde `config` (`R2_ENDPOINT`, `R2_BUCKET`, `R2_KEY_ID`, `R2_SECRET`).
+- Endpoint R2 y claves desde `config` (`R2_ENDPOINT`, `R2_BUCKET`, `R2_BUCKET_VPS`, `R2_KEY_ID`, `R2_SECRET`). El VPS solo conoce `R2_BUCKET_VPS`; el PC trae de ahí y respalda todo en `R2_BUCKET`.
 
 - [ ] **Step 1:** tests `test_subir_solo_lo_nuevo`, `test_traer_verifica_hash`, `test_manifiesto_al_final` y `test_claves_no_aparecen_en_logs` → FAIL.
 - [ ] **Step 2:** implementar. PASS.
