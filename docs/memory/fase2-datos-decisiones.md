@@ -24,6 +24,11 @@ Plan: `docs/superpowers/plans/2026-11-12-fase2-datos-historicos.md`. Rama del di
 ## Pendientes
 
 1. Revisión del PR del diseño por Oscar (y Daniel para lo del VPS).
-2. Task 0 del plan: Python y Postgres en el PC, cuenta R2 + clave FRED (Oscar), demo RAW (y Standard) de datos (Daniel), verificar los símbolos en cada fuente.
+2. Task 0 del plan: Python y Postgres en el PC, cuenta R2 + clave FRED (Oscar), verificar los símbolos en cada fuente.
+3. **Demo de datos creada (2026-11-12, por Oscar): cuenta 26415345** en Vantage. Falta confirmar que es RAW
+   y su servidor; la clave no se anota aquí. Se usará con `provision clon-datos` (Task 7 / Task 13) en
+   `C:\MT5_instances_n1\mt5_datos`. La demo Standard opcional (7.10) sigue sin crear.
+4. R2 va en la cuenta de Cloudflare que ya tiene Oscar (bucket `sentinel-datos`).
+5. El PR del diseño lo abre Oscar a mano: desde la sesión de Claude en la nube, GitHub devuelve 403 al crear PRs.
 
 **Cómo aplicar:** antes de implementar cualquier parte de `datos/`, leer el spec. Si un supuesto del spec resulta falso (profundidad, nombres, regla de hora), anotarlo aquí.
