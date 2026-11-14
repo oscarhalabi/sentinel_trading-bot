@@ -85,6 +85,12 @@ Rama `fase2/datos-historicos`, PR oscarhalabi/sentinel_trading-bot#3.
 - **Lo que tardaría la prioridad 1** (38 símbolos desde el inicio de cada uno): ~200.000 días, unos
   69 días de reloj a 30 s/día. XAUUSD solo (desde 2003-05-05, 8.591 días) son unos 3 días.
   Todavía no se ha probado si 4 en paralelo sin ráfagas vuelve a provocar el bloqueo.
+- **Descarga completa de XAUUSD (2026-11-14):** a 2/2 guardó ~98 días con ticks por hora, y a
+  3/3 ~116 (+18 %) sin 429. Decisión de Oscar: quedarse en 3/3 (4/4 no se prueba por riesgo
+  de bloqueo). Salen ~3 % de días con 503 o cortes sueltos, que se reintentan en el siguiente
+  lanzamiento. La descarga corre desde `C:\sentinel_datos\bajar_XAUUSD.cmd` abierto a mano: si se
+  lanza desde la app de Claude, muere cuando la app se reinicia. Para la prioridad 1 hay que
+  estudiar la exportación por S3 (Requester Pays).
 
 ## Pendientes
 
