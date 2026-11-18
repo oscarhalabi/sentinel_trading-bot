@@ -1,0 +1,23 @@
+{
+ "_nota": "PROVISIONAL: hecho a mano con la forma de la API de FRED; sustituir por respuesta real recortada (Task 12).",
+ "observations": [
+  {
+   "realtime_start": "2026-11-18",
+   "realtime_end": "2026-11-18",
+   "date": "2024-07-03",
+   "value": "4.45"
+  },
+  {
+   "realtime_start": "2026-11-18",
+   "realtime_end": "2026-11-18",
+   "date": "2024-07-04",
+   "value": "."
+  },
+  {
+   "realtime_start": "2026-11-18",
+   "realtime_end": "2026-11-18",
+   "date": "2024-07-05",
+   "value": "4.28"
+  }
+ ]
+}

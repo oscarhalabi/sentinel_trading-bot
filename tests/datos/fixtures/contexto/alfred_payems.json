@@ -1,0 +1,245 @@
+{
+ "_nota": "PROVISIONAL: hecho a mano con la forma de la API de ALFRED; sustituir por respuesta real recortada (Task 12).",
+ "observations": [
+  {
+   "realtime_start": "1960-01-01",
+   "realtime_end": "9999-12-31",
+   "date": "1950-01-01",
+   "value": "1001"
+  },
+  {
+   "realtime_start": "1960-01-01",
+   "realtime_end": "9999-12-31",
+   "date": "1950-02-01",
+   "value": "1002"
+  },
+  {
+   "realtime_start": "1960-01-01",
+   "realtime_end": "9999-12-31",
+   "date": "1950-03-01",
+   "value": "1003"
+  },
+  {
+   "realtime_start": "1960-01-01",
+   "realtime_end": "9999-12-31",
+   "date": "1950-04-01",
+   "value": "1004"
+  },
+  {
+   "realtime_start": "1960-01-01",
+   "realtime_end": "9999-12-31",
+   "date": "1950-05-01",
+   "value": "1005"
+  },
+  {
+   "realtime_start": "1960-01-01",
+   "realtime_end": "9999-12-31",
+   "date": "1950-06-01",
+   "value": "1006"
+  },
+  {
+   "realtime_start": "1960-01-01",
+   "realtime_end": "9999-12-31",
+   "date": "1950-07-01",
+   "value": "1007"
+  },
+  {
+   "realtime_start": "1960-01-01",
+   "realtime_end": "9999-12-31",
+   "date": "1950-08-01",
+   "value": "1008"
+  },
+  {
+   "realtime_start": "1960-01-01",
+   "realtime_end": "9999-12-31",
+   "date": "1950-09-01",
+   "value": "1009"
+  },
+  {
+   "realtime_start": "1960-01-01",
+   "realtime_end": "9999-12-31",
+   "date": "1950-10-01",
+   "value": "1010"
+  },
+  {
+   "realtime_start": "1960-01-01",
+   "realtime_end": "9999-12-31",
+   "date": "1950-11-01",
+   "value": "1011"
+  },
+  {
+   "realtime_start": "1960-01-01",
+   "realtime_end": "9999-12-31",
+   "date": "1950-12-01",
+   "value": "1012"
+  },
+  {
+   "realtime_start": "1960-01-01",
+   "realtime_end": "9999-12-31",
+   "date": "1951-01-01",
+   "value": "1013"
+  },
+  {
+   "realtime_start": "1960-01-01",
+   "realtime_end": "9999-12-31",
+   "date": "1951-02-01",
+   "value": "1014"
+  },
+  {
+   "realtime_start": "1960-01-01",
+   "realtime_end": "9999-12-31",
+   "date": "1951-03-01",
+   "value": "1015"
+  },
+  {
+   "realtime_start": "1960-01-01",
+   "realtime_end": "9999-12-31",
+   "date": "1951-04-01",
+   "value": "1016"
+  },
+  {
+   "realtime_start": "1960-01-01",
+   "realtime_end": "9999-12-31",
+   "date": "1951-05-01",
+   "value": "1017"
+  },
+  {
+   "realtime_start": "1960-01-01",
+   "realtime_end": "9999-12-31",
+   "date": "1951-06-01",
+   "value": "1018"
+  },
+  {
+   "realtime_start": "1960-01-01",
+   "realtime_end": "9999-12-31",
+   "date": "1951-07-01",
+   "value": "1019"
+  },
+  {
+   "realtime_start": "1960-01-01",
+   "realtime_end": "9999-12-31",
+   "date": "1951-08-01",
+   "value": "1020"
+  },
+  {
+   "realtime_start": "1960-01-01",
+   "realtime_end": "9999-12-31",
+   "date": "1951-09-01",
+   "value": "1021"
+  },
+  {
+   "realtime_start": "1960-01-01",
+   "realtime_end": "9999-12-31",
+   "date": "1951-10-01",
+   "value": "1022"
+  },
+  {
+   "realtime_start": "1960-01-01",
+   "realtime_end": "9999-12-31",
+   "date": "1951-11-01",
+   "value": "1023"
+  },
+  {
+   "realtime_start": "1960-01-01",
+   "realtime_end": "9999-12-31",
+   "date": "1951-12-01",
+   "value": "1024"
+  },
+  {
+   "realtime_start": "1960-01-01",
+   "realtime_end": "9999-12-31",
+   "date": "1952-01-01",
+   "value": "1025"
+  },
+  {
+   "realtime_start": "1960-01-01",
+   "realtime_end": "9999-12-31",
+   "date": "1952-02-01",
+   "value": "1026"
+  },
+  {
+   "realtime_start": "1960-01-01",
+   "realtime_end": "9999-12-31",
+   "date": "1952-03-01",
+   "value": "1027"
+  },
+  {
+   "realtime_start": "1960-01-01",
+   "realtime_end": "9999-12-31",
+   "date": "1952-04-01",
+   "value": "1028"
+  },
+  {
+   "realtime_start": "1960-01-01",
+   "realtime_end": "9999-12-31",
+   "date": "1952-05-01",
+   "value": "1029"
+  },
+  {
+   "realtime_start": "1960-01-01",
+   "realtime_end": "9999-12-31",
+   "date": "1952-06-01",
+   "value": "1030"
+  },
+  {
+   "realtime_start": "1960-01-01",
+   "realtime_end": "9999-12-31",
+   "date": "1952-07-01",
+   "value": "1031"
+  },
+  {
+   "realtime_start": "1960-01-01",
+   "realtime_end": "9999-12-31",
+   "date": "1952-08-01",
+   "value": "1032"
+  },
+  {
+   "realtime_start": "1960-01-01",
+   "realtime_end": "9999-12-31",
+   "date": "1952-09-01",
+   "value": "1033"
+  },
+  {
+   "realtime_start": "1960-01-01",
+   "realtime_end": "9999-12-31",
+   "date": "1952-10-01",
+   "value": "1034"
+  },
+  {
+   "realtime_start": "1960-01-01",
+   "realtime_end": "9999-12-31",
+   "date": "1952-11-01",
+   "value": "1035"
+  },
+  {
+   "realtime_start": "1960-01-01",
+   "realtime_end": "9999-12-31",
+   "date": "1952-12-01",
+   "value": "1036"
+  },
+  {
+   "realtime_start": "2024-03-08",
+   "realtime_end": "9999-12-31",
+   "date": "2024-02-01",
+   "value": "157000"
+  },
+  {
+   "realtime_start": "2024-04-05",
+   "realtime_end": "2024-05-02",
+   "date": "2024-03-01",
+   "value": "303000"
+  },
+  {
+   "realtime_start": "2024-05-03",
+   "realtime_end": "9999-12-31",
+   "date": "2024-03-01",
+   "value": "315000"
+  },
+  {
+   "realtime_start": "2024-05-03",
+   "realtime_end": "9999-12-31",
+   "date": "2024-04-01",
+   "value": "."
+  }
+ ]
+}
