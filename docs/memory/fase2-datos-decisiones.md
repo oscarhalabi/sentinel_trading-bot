@@ -91,6 +91,22 @@ Rama `fase2/datos-historicos`, PR oscarhalabi/sentinel_trading-bot#3.
   lanzamiento. La descarga corre desde `C:\sentinel_datos\bajar_XAUUSD.cmd` abierto a mano: si se
   lanza desde la app de Claude, muere cuando la app se reinicia. Para la prioridad 1 hay que
   estudiar la exportación por S3 (Requester Pays).
+- **XAUUSD completo (2026-11-18):** 7.328 días ok (2003-05-05 → 2026-11-16, 744 M ticks, ~6 GB),
+  1.538 vacíos y 0 errores en el rango, tras 5 pasadas (los 503 sueltos salen al reintentar). El
+  catálogo fijó `inicio=2003-05-05`. Antes de esa fecha la descarga anduvo 8 semanas vacías y se
+  paró sola, como debe.
+- **Velas M1:** 283 meses en 84 s (344 MB). `velas` **no registra las M1 en el catálogo** (solo
+  `catalogo reconstruir` las ve): pendiente de corregir.
+- **Consulta:** un año H1 en 0,1 s; un año M1 (356 mil velas) en 0,07 s; 22 años H1 o D1 en ~1,4 s.
+- **`catalogo reconstruir`** en `sentinel_datos_test`: 9.149 particiones en 2 s; los conteos de
+  ticks coinciden con el catálogo real (los 5 errores de antes de 2003 no tienen manifiesto).
+- **`verificar` XAUUSD (474 s):** 37.778 problemas, 125 graves. Los graves son casi todos
+  **festivos y cierres tempranos de EE. UU.** (MLK, Presidents, Memorial, 4 de julio, Labor,
+  Acción de Gracias, Nochebuena, Viernes Santo, Navidad, Año Nuevo, Juneteenth): la plantilla de
+  horario no sabe de festivos. En 2003 los domingos no traen datos. Pocos huecos reales posibles
+  (2003-07-28, 2003-08-04, 2005-01-18). Los avisos de `salto` (36.505, de un tick y $0,2–1,8) y de
+  `conteo` (983, todos antes de 2023, porque la mediana es la de los 23 años y los años viejos
+  tienen muchos menos ticks) son ruido de umbral. Pendiente: calendario de festivos y mediana móvil.
 
 ## Pendientes
 
