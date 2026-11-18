@@ -56,7 +56,8 @@
       "id": "GDP",
       "hora": "08:30",
       "zona": "America/New_York",
-      "retraso_tipico_dias": 30
+      "retraso_tipico_dias": 30,
+      "frecuencia": "q"
     },
     {
       "id": "RSAFS",
@@ -68,7 +69,8 @@
       "id": "ICSA",
       "hora": "08:30",
       "zona": "America/New_York",
-      "retraso_tipico_dias": 5
+      "retraso_tipico_dias": 5,
+      "frecuencia": "w"
     }
   ],
   "series_fred": [

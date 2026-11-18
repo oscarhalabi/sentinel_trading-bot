@@ -17,6 +17,7 @@ _RETRASO = re.compile(r"^(habil\+1|mismo|lunes)@([01]\d|2[0-3]):[0-5]\d$")
 _LATENCIA = re.compile(r"^\d+(\.\d+)?s$")
 _DIVISA = re.compile(r"^[A-Z]{3}$")
 _IMPACTOS = ("bajo", "medio", "alto")
+_FRECUENCIAS = ("m", "q", "w")
 
 
 def _leer(ruta: Path) -> dict:
@@ -76,6 +77,9 @@ def _item_alfred(it: dict, ruta: str) -> None:
     r = it.get("retraso_tipico_dias")
     _exigir(isinstance(r, int) and not isinstance(r, bool) and r >= 0,
             f"{ruta}.retraso_tipico_dias", f"debe ser un entero de 0 o más, no {r!r}.")
+    f = it.get("frecuencia", "m")
+    _exigir(f in _FRECUENCIAS, f"{ruta}.frecuencia",
+            f"debe ser 'm' (mensual), 'q' (trimestral) o 'w' (semanal), no {f!r}.")
 
 
 def _item_fred(it: dict, ruta: str) -> None:

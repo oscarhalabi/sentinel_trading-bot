@@ -51,6 +51,17 @@ def test_retraso_desconocido_aborta(tmp_path):
         cargar_contexto(_contexto_con(tmp_path, cambio))
 
 
+def test_frecuencia_de_serie(tmp_path):
+    ctx = cargar_contexto()
+    frec = {s["id"]: s.get("frecuencia", "m") for s in ctx["series_alfred"]}
+    assert frec["GDP"] == "q" and frec["ICSA"] == "w" and frec["PAYEMS"] == "m"
+
+    def cambio(d):
+        d["series_alfred"][2]["frecuencia"] = "anual"
+    with pytest.raises(ConfigInvalida, match=r"series_alfred\[2\]\.frecuencia"):
+        cargar_contexto(_contexto_con(tmp_path, cambio))
+
+
 def test_divisa_mal_puesta_aborta(tmp_path):
     def cambio(d):
         d["divisas_calendario"].append("DOLAR")
