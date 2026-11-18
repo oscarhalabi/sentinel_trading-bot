@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import warnings
@@ -45,10 +46,67 @@ ESQUEMA_M1 = pa.schema([
     ("ask_vol", pa.float64()),
 ])
 
-_ESQUEMAS = {"ticks": ESQUEMA_TICKS, "m1": ESQUEMA_M1}
-VERSION_ESQUEMA = {"ticks": 1, "m1": 1}
+_TS = pa.timestamp("us", tz="UTC")
 
-Tipo = Literal["ticks", "m1"]
+# Datos de contexto (Fase 2C). Todos los timestamps son us UTC.
+ESQUEMA_CALENDARIO = pa.schema([
+    ("ts_evento", _TS), ("ts_anunciado", _TS), ("ts_conocido", _TS),
+    ("ts_version", _TS), ("ts_foto", _TS),  # ts_foto es nulo salvo en ForexFactory
+    ("fuente", pa.string()), ("id_fuente", pa.string()), ("pais", pa.string()),
+    ("divisa", pa.string()), ("evento", pa.string()), ("evento_fuente", pa.string()),
+    ("categoria", pa.string()), ("impacto", pa.string()), ("unidad", pa.string()),
+    ("programado", pa.bool_()), ("hora_exacta", pa.bool_()), ("prevision_es_pit", pa.bool_()),
+    ("real", pa.float64()), ("prevision", pa.float64()),
+    ("anterior", pa.float64()), ("anterior_revisado", pa.float64()),
+])
+
+ESQUEMA_SERIE = pa.schema([
+    ("serie", pa.string()), ("periodo", pa.date32()), ("valor", pa.float64()),
+    ("ts_conocido", _TS), ("ts_hasta", _TS),  # ts_hasta nulo = vigente
+    ("fuente", pa.string()), ("publicacion_estimada", pa.bool_()),
+])
+
+ESQUEMA_COT = pa.schema([  # formato largo
+    ("mercado", pa.string()), ("informe", pa.string()), ("campo", pa.string()),
+    ("fecha_informe", pa.date32()), ("valor", pa.float64()),
+    ("ts_conocido", _TS), ("ts_version", _TS), ("publicacion_tardia", pa.bool_()),
+])
+
+ESQUEMA_ETF = pa.schema([
+    ("etf", pa.string()), ("fecha", pa.date32()),
+    ("toneladas", pa.float64()), ("valor_usd", pa.float64()), ("ts_conocido", _TS),
+])
+
+ESQUEMA_CORPORATIVO = pa.schema([
+    ("simbolo", pa.string()), ("tipo", pa.string()), ("fuente", pa.string()),
+    ("fecha_ex", pa.date32()), ("fecha_anuncio", pa.date32()),
+    ("razon", pa.float64()), ("importe", pa.float64()), ("divisa", pa.string()),
+    ("ts_conocido", _TS),
+])
+
+
+@dataclass(frozen=True)
+class TipoDatos:
+    """Cómo se guarda un tipo de dato: esquema, columna de tiempo y partición."""
+    esquema: pa.Schema
+    columna_tiempo: str
+    particion: Literal["dia", "mes", "anio", "completo"]
+    version: int
+
+
+TIPOS: dict[str, TipoDatos] = {
+    "ticks": TipoDatos(ESQUEMA_TICKS, "ts", "dia", 1),
+    "m1": TipoDatos(ESQUEMA_M1, "ts", "mes", 1),
+    "calendario": TipoDatos(ESQUEMA_CALENDARIO, "ts_evento", "anio", 1),
+    "serie": TipoDatos(ESQUEMA_SERIE, "ts_conocido", "completo", 1),
+    "cot": TipoDatos(ESQUEMA_COT, "ts_conocido", "anio", 1),
+    "etf": TipoDatos(ESQUEMA_ETF, "ts_conocido", "completo", 1),
+    "corporativo": TipoDatos(ESQUEMA_CORPORATIVO, "ts_conocido", "completo", 1),
+}
+_ESQUEMAS = {k: v.esquema for k, v in TIPOS.items()}
+VERSION_ESQUEMA = {k: v.version for k, v in TIPOS.items()}
+
+Tipo = Literal["ticks", "m1", "calendario", "serie", "cot", "etf", "corporativo"]
 Estado = Literal["ok", "vacio", "incompleto", "falta"]
 
 CARPETA_MANIFIESTOS = "_manifiestos"
@@ -94,17 +152,37 @@ class Manifiesto:
 
 # --- rutas -----------------------------------------------------------------
 
-def ruta_relativa(tipo: Tipo, fuente: str, simbolo: str, periodo: date) -> PurePosixPath:
-    base = PurePosixPath(tipo) / f"fuente={fuente}" / f"simbolo={simbolo}" / f"anio={periodo.year:04d}"
-    if tipo == "ticks":
+def _tipo_datos(tipo: str) -> TipoDatos:
+    try:
+        return TIPOS[tipo]
+    except KeyError:
+        raise ValueError(f"Tipo desconocido: {tipo!r}") from None
+
+
+def ruta_relativa(tipo: Tipo, fuente: str, simbolo: str, periodo: date | None) -> PurePosixPath:
+    """Ruta del Parquet. Con partición `completo` el periodo se ignora; con `anio`
+    basta cualquier fecha de ese año."""
+    particion = _tipo_datos(tipo).particion
+    base = PurePosixPath(tipo) / f"fuente={fuente}" / f"simbolo={simbolo}"
+    if particion == "completo":
+        return base / "completo.parquet"
+    if periodo is None:
+        raise ValueError(f"El tipo {tipo!r} necesita un periodo (fecha)")
+    if particion == "anio":
+        return base / f"anio={periodo.year:04d}.parquet"
+    base = base / f"anio={periodo.year:04d}"
+    if particion == "dia":
         return base / f"{periodo:%Y-%m-%d}.parquet"
-    if tipo == "m1":
-        return base / f"{periodo:%Y-%m}.parquet"
-    raise ValueError(f"Tipo desconocido: {tipo!r}")
+    return base / f"{periodo:%Y-%m}.parquet"
 
 
-def _periodo_texto(tipo: str, periodo: date) -> str:
-    return f"{periodo:%Y-%m-%d}" if tipo == "ticks" else f"{periodo:%Y-%m}"
+def _periodo_texto(tipo: str, periodo: date | None) -> str:
+    particion = _tipo_datos(tipo).particion
+    if particion == "completo":
+        return "completo"
+    if particion == "anio":
+        return f"{periodo.year:04d}"
+    return f"{periodo:%Y-%m-%d}" if particion == "dia" else f"{periodo:%Y-%m}"
 
 
 def _ruta_manifiesto(raiz: Path, ruta_rel: str | PurePosixPath) -> Path:
@@ -143,15 +221,16 @@ def _iso(valor: datetime) -> str:
 
 
 def _validar(tabla: pa.Table, tipo: str) -> None:
-    esperado = _ESQUEMAS[tipo]
-    for campo in esperado:
+    definicion = _tipo_datos(tipo)
+    for campo in definicion.esquema:
         if campo.name not in tabla.schema.names:
             raise EsquemaInvalido(f"Falta la columna '{campo.name}' en {tipo}")
-    ts = tabla.schema.field("ts").type
+    col = definicion.columna_tiempo
+    ts = tabla.schema.field(col).type
     if not pa.types.is_timestamp(ts) or ts.tz is None or ts.tz.upper() not in ("UTC", "+00:00"):
-        raise EsquemaInvalido(f"La columna 'ts' debe ser timestamp con zona UTC, no {ts}")
+        raise EsquemaInvalido(f"La columna '{col}' debe ser timestamp con zona UTC, no {ts}")
     if ts.unit != "us":
-        raise EsquemaInvalido(f"La columna 'ts' debe estar en microsegundos, no '{ts.unit}'")
+        raise EsquemaInvalido(f"La columna '{col}' debe estar en microsegundos, no '{ts.unit}'")
 
 
 def _escribir_atomico(destino: Path, contenido: bytes | None = None, tabla: pa.Table | None = None) -> None:
@@ -192,11 +271,12 @@ def leer_manifiesto(raiz: Path, ruta_rel: str) -> Manifiesto | None:
 
 
 def escribir(raiz: Path, tabla: pa.Table, tipo: Tipo, fuente: str, simbolo: str,
-             periodo: date, origen: dict[str, str] | None = None) -> Manifiesto:
-    """Valida, ordena por ts y escribe el Parquet y su manifiesto de forma segura."""
+             periodo: date | None, origen: dict[str, str] | None = None) -> Manifiesto:
+    """Valida, ordena por la columna de tiempo y escribe el Parquet y su manifiesto de forma segura."""
     raiz = Path(raiz)
     _validar(tabla, tipo)
-    tabla = tabla.sort_by("ts")
+    col = _tipo_datos(tipo).columna_tiempo
+    tabla = tabla.sort_by(col)
     rel = ruta_relativa(tipo, fuente, simbolo, periodo)
     destino = raiz / rel
 
@@ -208,8 +288,8 @@ def escribir(raiz: Path, tabla: pa.Table, tipo: Tipo, fuente: str, simbolo: str,
     _escribir_atomico(destino, tabla=tabla)
 
     filas = tabla.num_rows
-    ts_min = _iso(pc.min(tabla["ts"]).as_py()) if filas else None
-    ts_max = _iso(pc.max(tabla["ts"]).as_py()) if filas else None
+    ts_min = _iso(pc.min(tabla[col]).as_py()) if filas else None
+    ts_max = _iso(pc.max(tabla[col]).as_py()) if filas else None
     m = Manifiesto(
         ruta=str(rel), tipo=tipo, fuente=fuente, simbolo=simbolo,
         periodo=_periodo_texto(tipo, periodo), estado="ok", filas=filas,
@@ -222,7 +302,7 @@ def escribir(raiz: Path, tabla: pa.Table, tipo: Tipo, fuente: str, simbolo: str,
     return m
 
 
-def marcar_vacio(raiz: Path, tipo: Tipo, fuente: str, simbolo: str, periodo: date) -> Manifiesto:
+def marcar_vacio(raiz: Path, tipo: Tipo, fuente: str, simbolo: str, periodo: date | None) -> Manifiesto:
     """Anota que el periodo no tiene datos. No se hace si ya existe un Parquet."""
     raiz = Path(raiz)
     rel = ruta_relativa(tipo, fuente, simbolo, periodo)
@@ -238,7 +318,7 @@ def marcar_vacio(raiz: Path, tipo: Tipo, fuente: str, simbolo: str, periodo: dat
     return m
 
 
-def estado(raiz: Path, tipo: Tipo, fuente: str, simbolo: str, periodo: date,
+def estado(raiz: Path, tipo: Tipo, fuente: str, simbolo: str, periodo: date | None,
            verificar_hash: bool = False) -> Estado:
     """ok / vacio / incompleto / falta. El hash solo se comprueba con verificar_hash=True."""
     raiz = Path(raiz)
@@ -271,6 +351,48 @@ def listar_manifiestos(raiz: Path, tipo: str | None = None, fuente: str | None =
         m = _leer_archivo_manifiesto(p)
         if m is not None:
             yield m
+
+
+# --- respuestas crudas -----------------------------------------------------
+
+_NOMBRE_CRUDO = re.compile(r"[A-Za-z0-9_-]+")
+
+
+def escribir_crudo(raiz: Path, contenido: bytes, fuente: str, nombre: str,
+                   momento: datetime, extension: str) -> Manifiesto:
+    """Guarda una respuesta descargada tal cual, comprimida con zstd, y su manifiesto."""
+    if not _NOMBRE_CRUDO.fullmatch(nombre):
+        raise ValueError(f"Nombre de crudo no válido (solo letras, números, _ y -): {nombre!r}")
+    raiz = Path(raiz)
+    momento = momento.astimezone(timezone.utc)
+    rel = (PurePosixPath("crudo") / f"fuente={fuente}" / f"{momento:%Y}" / f"{momento:%m}"
+           / f"{momento:%d}" / f"{momento:%H%M%S}_{nombre}.{extension}.zst")
+    salida = pa.BufferOutputStream()
+    with pa.CompressedOutputStream(salida, "zstd") as z:
+        z.write(contenido)
+    _escribir_atomico(raiz / rel, contenido=salida.getvalue().to_pybytes())
+    destino = raiz / rel
+    m = Manifiesto(
+        ruta=str(rel), tipo="crudo", fuente=fuente, simbolo="",
+        periodo=f"{momento:%Y-%m-%d}", estado="ok", filas=0,
+        ts_min=_iso(momento), ts_max=_iso(momento), sha256=_sha256(destino),
+        esquema_version=1, descargado_en=_ahora(), commit=_commit(),
+        bytes=destino.stat().st_size,
+    )
+    _guardar_manifiesto(raiz, m)
+    return m
+
+
+def leer_crudo(raiz: Path, ruta_rel: str) -> bytes:
+    """El contenido original (descomprimido) de un crudo guardado."""
+    with pa.CompressedInputStream(pa.OSFile(str(Path(raiz) / ruta_rel), "rb"), "zstd") as z:
+        return z.read()
+
+
+def listar_crudos(raiz: Path, fuente: str | None = None) -> Iterator[Manifiesto]:
+    """Manifiestos de crudos, por orden de `ts_min` (opcionalmente de una sola fuente)."""
+    crudos = [m for m in listar_manifiestos(raiz, "crudo", fuente) if m.tipo == "crudo"]
+    yield from sorted(crudos, key=lambda m: m.ts_min or "")
 
 
 def espacio_libre_gb(raiz: Path) -> float:
