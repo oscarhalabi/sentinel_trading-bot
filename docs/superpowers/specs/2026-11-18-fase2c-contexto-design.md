@@ -53,7 +53,7 @@ depende de un supuesto afortunado.
 | `serie` (fuente `fred`) | FRED | De mercado, sin revisiones: DGS10, DGS2, DFII10, T10YIE, DFF, DTWEXBGS, VIXCLS (más las que pida la Fase 3) | diaria |
 | `cot` | CFTC (archivos anuales, informes Legacy y Disaggregated / TFF) | Oro, plata, cobre, petróleo WTI, divisas G10, S&P 500, Nasdaq 100, Dow, bonos a 10 años | semanal |
 | `etf` | SPDR (CSV histórico de GLD) | Toneladas y valor | diaria |
-| `corporativo` | La API barata del calendario (FMP o EODHD tienen splits y dividendos) | Acciones y ETFs del registro (`clase` `accion`/`etf`) | semanal |
+| `corporativo` | Una API barata (FMP o EODHD), **contratada aunque gane la premium** (decisión de Oscar, 2026-11-18) | Acciones y ETFs del registro (`clase` `accion`/`etf`) | semanal |
 
 Las listas de series y mercados viven en un archivo de configuración versionado
 (`datos/contexto.json`), no en el código: añadir una serie es añadir una línea.
@@ -216,6 +216,14 @@ Orden reproducible `python -m datos contexto probar-calendario --fuentes te,fmp,
   impacto alto de USD y EUR, y el precio es razonable a juicio de Oscar. Si no, la barata.
 - La elegida queda como fuente `calendario` por defecto. Las demás clases de fuente se quedan en
   el código (intercambiables).
+- **Cuentas de prueba (Oscar, 2026-11-18):** Oscar crea las cuentas y guarda las claves en el `.env`
+  de la laptop (`TE_API_KEY`, `FMP_API_KEY`, `EODHD_API_KEY`). Primero con los planes gratuitos.
+  Trading Economics solo si su prueba es fácil de obtener (sin tarjeta, o con un precio que Oscar
+  apruebe) y no bloquea por país; si no, la comparación se hace solo con FMP y EODHD y queda escrito en
+  el informe. Si los planes gratuitos no llegan a 2008, Oscar decide si paga un mes de la mejor
+  candidata para completar la prueba.
+- **La barata se contrata en cualquier caso** para `corporativo` (splits y dividendos de las acciones
+  y ETFs del registro).
 
 ## 8. Foto de Forex Factory
 
