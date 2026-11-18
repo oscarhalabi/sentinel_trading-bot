@@ -222,6 +222,11 @@ Orden reproducible `python -m datos contexto probar-calendario --fuentes te,fmp,
   apruebe) y no bloquea por país; si no, la comparación se hace solo con FMP y EODHD y queda escrito en
   el informe. Si los planes gratuitos no llegan a 2008, Oscar decide si paga un mes de la mejor
   candidata para completar la prueba.
+- **Trading Economics (comprobado por Oscar, 2026-11-18):** el calendario económico por API solo
+  está en el plan **Enterprise** (precio a medida, facturación trimestral o anual). Las pruebas de
+  Standard (49 USD) y Professional (99 USD) **no incluyen el calendario**, así que no se pagan. Oscar
+  pide una cotización de Enterprise (gratis); mientras tanto la prueba compara FMP y EODHD. Si la
+  cotización compensa, Trading Economics se añade como una fuente más.
 - **La barata se contrata en cualquier caso** para `corporativo` (splits y dividendos de las acciones
   y ETFs del registro).
 
