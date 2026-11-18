@@ -1,6 +1,7 @@
 """Verificación de calidad de los ticks guardados y el informe HTML."""
 from __future__ import annotations
 
+import bisect
 import html
 import statistics
 from collections import defaultdict
@@ -23,6 +24,7 @@ Gravedad = Literal["info", "aviso", "grave"]
 HORAS_HUECO_GRAVE = 3
 UMBRAL_CONTEO = 0.20      # día con menos de 20 % de la mediana
 MIN_DIAS_CONTEO = 5
+VENTANA_CONTEO_DIAS = 45   # la mediana es la de los días a ±45 días de calendario
 VENTANA_SALTO = 200
 MIN_VENTANA_SALTO = 50
 FACTOR_SALTO = 8.0
@@ -145,7 +147,9 @@ def chequear_saltos(tabla: pd.DataFrame, simbolo: str,
 
 def chequear_conteo(conteos: dict[date, int], simbolo: str, fuente: str = "dukascopy",
                     sim=None) -> list[Problema]:
-    """Días con menos del 20 % de la mediana de ticks (hacen falta 5 días).
+    """Días con menos del 20 % de la mediana de ticks de los días cercanos (±45 días; hacen
+    falta 5 días en la ventana). Se compara con los vecinos y no con toda la historia porque
+    la cantidad de ticks cambia mucho con los años.
     Con `sim`, se compara ticks por hora abierta (los días parciales, como el domingo,
     no se marcan); los días sin horas abiertas se saltan."""
     if sim is not None:
@@ -156,15 +160,21 @@ def chequear_conteo(conteos: dict[date, int], simbolo: str, fuente: str = "dukas
                 valores[d] = n / horas
     else:
         valores = dict(conteos)
-    if len(valores) < MIN_DIAS_CONTEO:
-        return []
-    mediana = statistics.median(valores.values())
-    if mediana <= 0:
-        return []
-    return [Problema("conteo", simbolo, fuente, _inicio_dia(d), _inicio_dia(d) + timedelta(days=1),
-                     "aviso", {"ticks": int(conteos[d]), "por_hora_abierta": float(v),
-                               "mediana": float(mediana)})
-            for d, v in sorted(valores.items()) if v < UMBRAL_CONTEO * mediana]
+    dias = sorted(valores)
+    salida = []
+    for d in dias:
+        a = bisect.bisect_left(dias, d - timedelta(days=VENTANA_CONTEO_DIAS))
+        b = bisect.bisect_right(dias, d + timedelta(days=VENTANA_CONTEO_DIAS))
+        if b - a < MIN_DIAS_CONTEO:
+            continue
+        mediana = statistics.median(valores[x] for x in dias[a:b])
+        v = valores[d]
+        if mediana > 0 and v < UMBRAL_CONTEO * mediana:
+            salida.append(Problema(
+                "conteo", simbolo, fuente, _inicio_dia(d), _inicio_dia(d) + timedelta(days=1),
+                "aviso", {"ticks": int(conteos[d]), "por_hora_abierta": float(v),
+                          "mediana": float(mediana)}))
+    return salida
 
 
 def chequear_split(cierres: pd.DataFrame, simbolo: str,
@@ -199,8 +209,9 @@ def _dias(cfg: Config, simbolo: str, fuente: str):
 
 def chequear_dias_vacios(dias_vacios: list[date], sim, fuente: str = "dukascopy",
                          primer_ok: date | None = None) -> list[Problema]:
-    """Día `vacio` con horas abiertas en la plantilla = hueco grave (p. ej., caída de la
-    fuente). Solo cuentan los días posteriores al primer día ok: los vacíos de antes son
+    """Día `vacio` con horas abiertas en la plantilla = hueco (p. ej., caída de la fuente),
+    grave si son 3 horas o más (un domingo con 1-2 horas abiertas es aviso, como cualquier
+    hueco corto). Solo cuentan los días posteriores al primer día ok: los vacíos de antes son
     el tramo anterior al inicio del símbolo, donde la descarga se paró."""
     salida = []
     for d in dias_vacios:
@@ -211,7 +222,8 @@ def chequear_dias_vacios(dias_vacios: list[date], sim, fuente: str = "dukascopy"
             inicio = _inicio_dia(d)
             salida.append(Problema(
                 "hueco", sim.simbolo, fuente, inicio + timedelta(hours=horas[0]),
-                inicio + timedelta(hours=horas[-1] + 1), "grave",
+                inicio + timedelta(hours=horas[-1] + 1),
+                "grave" if len(horas) >= HORAS_HUECO_GRAVE else "aviso",
                 {"motivo": "dia_vacio_en_horario_abierto"}))
     return salida
 

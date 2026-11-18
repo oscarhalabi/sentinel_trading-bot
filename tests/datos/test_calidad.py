@@ -292,3 +292,35 @@ def test_sabado_vacio_no_es_problema(tmp_path):
     _guardar_dia(tmp_path, date(2024, 5, 13), _cada_minuto(date(2024, 5, 13)))
     marcar_vacio(tmp_path, "ticks", "dukascopy", "XAUUSD", date(2024, 5, 18))
     assert verificar(_cfg(tmp_path), [_sim()], None) == []
+
+
+def test_domingo_vacio_es_aviso_no_grave(tmp_path):
+    # El domingo solo abre 1-2 horas: si no trae datos es un hueco corto, como los de < 3 h.
+    from datos.almacen import marcar_vacio
+    _guardar_dia(tmp_path, date(2024, 5, 10), _cada_minuto(date(2024, 5, 10)))
+    _guardar_dia(tmp_path, date(2024, 5, 13), _cada_minuto(date(2024, 5, 13)))
+    marcar_vacio(tmp_path, "ticks", "dukascopy", "XAUUSD", date(2024, 5, 12))
+    vacios = [p for p in verificar(_cfg(tmp_path), [_sim()], None)
+              if p.detalle.get("motivo") == "dia_vacio_en_horario_abierto"]
+    assert len(vacios) == 1 and vacios[0].gravedad == "aviso"
+
+
+def test_festivo_vacio_no_es_problema(tmp_path):
+    # Viernes Santo 2024: la CME cierra, el día vacío no es un hueco.
+    from datos.almacen import marcar_vacio
+    _guardar_dia(tmp_path, date(2024, 3, 28), _cada_minuto(date(2024, 3, 28)))
+    marcar_vacio(tmp_path, "ticks", "dukascopy", "XAUUSD", date(2024, 3, 29))
+    assert not [p for p in verificar(_cfg(tmp_path), [_sim()], None)
+                if p.detalle.get("motivo") == "dia_vacio_en_horario_abierto"]
+
+
+def test_conteo_compara_con_los_dias_cercanos():
+    # Años viejos con 10 veces menos ticks: no son días malos, solo otra época.
+    viejos = {date(2010, 1, 1) + timedelta(days=i): 100 for i in range(60)}
+    nuevos = {date(2024, 1, 1) + timedelta(days=i): 1000 for i in range(60)}
+    assert chequear_conteo({**viejos, **nuevos}, "XAUUSD", "dukascopy") == []
+    # Un día flojo entre los nuevos sí se marca, contra la mediana de sus vecinos.
+    nuevos[date(2024, 1, 30)] = 150
+    r = chequear_conteo({**viejos, **nuevos}, "XAUUSD", "dukascopy")
+    assert [p.desde for p in r] == [_t(2024, 1, 30)]
+    assert r[0].detalle["mediana"] == 1000

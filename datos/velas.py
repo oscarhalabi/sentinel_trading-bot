@@ -63,17 +63,24 @@ def _meses_de_ticks(cfg: Config, fuente: str, simbolos: list[str] | None,
 
 
 def construir_m1(cfg: Config, fuente: str = "dukascopy", simbolos: list[str] | None = None,
-                 desde: date | None = None) -> int:
-    """Rehace las M1 de los meses cuyos ticks cambiaron. Devuelve los meses escritos."""
+                 desde: date | None = None, catalogo=None) -> int:
+    """Rehace las M1 de los meses cuyos ticks cambiaron. Devuelve los meses escritos.
+
+    Con `catalogo`, anota cada mes en él, también los que no cambiaron (así un catálogo
+    al que le faltaban se pone al día sin `catalogo reconstruir`)."""
     escritos = 0
     meses = _meses_de_ticks(cfg, fuente, simbolos, desde)
     for (simbolo, mes), origen in sorted(meses.items()):
         periodo = date.fromisoformat(mes + "-01")
         previo = leer_manifiesto(cfg.data_dir, str(ruta_relativa("m1", fuente, simbolo, periodo)))
         if previo and previo.estado == "ok" and previo.origen == origen:
+            if catalogo:
+                catalogo.registrar(previo)
             continue
         tablas = [pq.read_table(Path(cfg.data_dir) / ruta) for ruta in sorted(origen)]
         ticks = pa.concat_tables(tablas)
-        escribir(cfg.data_dir, velas_de_ticks(ticks), "m1", fuente, simbolo, periodo, origen)
+        m = escribir(cfg.data_dir, velas_de_ticks(ticks), "m1", fuente, simbolo, periodo, origen)
+        if catalogo:
+            catalogo.registrar(m)
         escritos += 1
     return escritos

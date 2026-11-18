@@ -115,3 +115,24 @@ def test_cli_velas(tmp_path, capsys):
     _dia(cfg, date(2026, 1, 5))
     assert main(["velas", "--simbolo", "XAUUSD", "--desde", "2026-01-01"], config=cfg) == 0
     assert "1" in capsys.readouterr().out
+
+
+class _CatalogoQueAnota:
+    def __init__(self):
+        self.registrados = []
+
+    def registrar(self, m):
+        self.registrados.append(m.periodo)
+
+
+def test_m1_se_anota_en_el_catalogo(tmp_path):
+    cfg = _cfg(tmp_path)
+    _dia(cfg, date(2026, 1, 5))
+    _dia(cfg, date(2026, 2, 3))
+    cat = _CatalogoQueAnota()
+    assert construir_m1(cfg, catalogo=cat) == 2
+    assert sorted(cat.registrados) == ["2026-01", "2026-02"]
+    # Los meses que no cambian también se anotan: así se llena un catálogo que no los tenía.
+    cat = _CatalogoQueAnota()
+    assert construir_m1(cfg, catalogo=cat) == 0
+    assert sorted(cat.registrados) == ["2026-01", "2026-02"]

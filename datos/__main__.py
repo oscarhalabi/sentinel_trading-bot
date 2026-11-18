@@ -150,7 +150,16 @@ def _velas(args, config) -> int:
     from datos.velas import construir_m1
 
     cfg = config if config is not None else cargar_config()
-    n = construir_m1(cfg, simbolos=args.simbolo or None, desde=args.desde)
+    cat = None
+    if cfg.pg_dsn:
+        from datos.catalogo import Catalogo
+        try:
+            cat = Catalogo(cfg.pg_dsn)
+        except Exception as e:  # el mensaje de psycopg2 puede traer el DSN: no se imprime
+            print(f"No se pudo conectar al Postgres del catálogo ({type(e).__name__}). "
+                  "No se arman velas.", file=sys.stderr)
+            return 1
+    n = construir_m1(cfg, simbolos=args.simbolo or None, desde=args.desde, catalogo=cat)
     print(f"Velas M1: {n} meses escritos.")
     return 0
 
