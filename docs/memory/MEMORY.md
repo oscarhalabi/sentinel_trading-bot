@@ -4,6 +4,7 @@
 - [Checkpoint Fase 1 (2026-11-03)](estado-fase1-checkpoint.md) — qué cuentas corren (correo ↔ cuenta ↔ bot), prueba punta a punta (Fase 1 cerrada) y próximos pasos
 - [Decisiones de la Fase 2 (datos)](fase2-datos-decisiones.md) — 2026-11-12 (rehecha con superpowers): subproyectos 2A–2E, ticks de todo lo posible, laptop de Oscar, sin ver el futuro, reserva de 12 meses; Task 11: XAUUSD completo, ritmo 3/3, festivos en verificar; pendientes
 - [Evaluación de MiroFish](mirofish-evaluacion.md) — 2026-11-12: simulador de opinión en redes con agentes LLM (no de mercados); AGPL; solo probable hacia delante; no se fuerza
+- [Forma de trabajar de Oscar](forma-de-trabajar-oscar.md) — cuestionar cada decisión buscando algo dinámico y pragmático; supuestos como parámetros
 - [Equipo y flujo git](equipo-y-flujo-git.md) — Oscar (estrategia/análisis) y Daniel (app web/servidor); ramas, PR, revisión cruzada, tags, identidad por commit
 
 ## Infraestructura heredada (describen el bot de producción exp-1/e2; la mecánica sigue valiendo)
