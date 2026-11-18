@@ -1,0 +1,517 @@
+{
+ "instruments": {
+  "EUR/USD": {
+   "title": "EUR/USD",
+   "special": false,
+   "name": "EUR/USD",
+   "description": "Euro vs US Dollar",
+   "historical_filename": "EURUSD",
+   "pipValue": 0.0001,
+   "base_currency": "EUR",
+   "quote_currency": "USD",
+   "commodities_per_contract": "1",
+   "tag_list": [
+    "CFD_INSTRUMENTS",
+    "FX_CFD_ALL",
+    "GLOBAL_ACCOUNTS"
+   ],
+   "history_start_tick": "1167609605163",
+   "history_start_10sec": "1329075780000",
+   "history_start_60sec": "1167609600000",
+   "history_start_60min": "1052074800000",
+   "history_start_day": "0",
+   "unit": null
+  },
+  "USD/JPY": {
+   "title": "USD/JPY",
+   "special": false,
+   "name": "USD/JPY",
+   "description": "US Dollar vs Japanese Yen",
+   "historical_filename": "USDJPY",
+   "pipValue": 0.01,
+   "base_currency": "USD",
+   "quote_currency": "JPY",
+   "commodities_per_contract": "1",
+   "tag_list": [
+    "CFD_INSTRUMENTS",
+    "FX_CFD_ALL",
+    "GLOBAL_ACCOUNTS"
+   ],
+   "history_start_tick": "1174953612380",
+   "history_start_10sec": "1329075780000",
+   "history_start_60sec": "1174953600000",
+   "history_start_60min": "1052067600000",
+   "history_start_day": "0",
+   "unit": null
+  },
+  "EUR/GBP": {
+   "title": "EUR/GBP",
+   "special": false,
+   "name": "EUR/GBP",
+   "description": "Euro vs Pound Sterling",
+   "historical_filename": "EURGBP",
+   "pipValue": 0.0001,
+   "base_currency": "EUR",
+   "quote_currency": "GBP",
+   "commodities_per_contract": "1",
+   "tag_list": [
+    "CFD_INSTRUMENTS",
+    "FX_CFD_ALL",
+    "GLOBAL_ACCOUNTS"
+   ],
+   "history_start_tick": "1328796339882",
+   "history_start_10sec": "1329075780000",
+   "history_start_60sec": "1326245820000",
+   "history_start_60min": "1059930000000",
+   "history_start_day": "0",
+   "unit": null
+  },
+  "USD/TRY": {
+   "title": "USD/TRY",
+   "special": false,
+   "name": "USD/TRY",
+   "description": "US Dollar vs Turkish Lira",
+   "historical_filename": "USDTRY",
+   "pipValue": 0.0001,
+   "base_currency": "USD",
+   "quote_currency": "TRY",
+   "commodities_per_contract": "1",
+   "tag_list": [
+    "CFD_INSTRUMENTS",
+    "FX_CFD_ALL",
+    "GLOBAL_ACCOUNTS"
+   ],
+   "history_start_tick": "1328796341689",
+   "history_start_10sec": "1329075780000",
+   "history_start_60sec": "1326245820000",
+   "history_start_60min": "1262304000000",
+   "history_start_day": "0",
+   "unit": null
+  },
+  "XAU/USD": {
+   "title": "XAU/USD",
+   "special": false,
+   "name": "XAU/USD",
+   "description": "Spot gold",
+   "historical_filename": "XAUUSD",
+   "pipValue": 0.01,
+   "base_currency": "XAU",
+   "quote_currency": "USD",
+   "commodities_per_contract": "1",
+   "tag_list": [
+    "CFD_INSTRUMENTS",
+    "FX_CFD_ALL",
+    "GLOBAL_ACCOUNTS"
+   ],
+   "history_start_tick": "1052092863421",
+   "history_start_10sec": "1406309540000",
+   "history_start_60sec": "1052092860000",
+   "history_start_60min": "1052092800000",
+   "history_start_day": "0",
+   "unit": null,
+   "volume": 1
+  },
+  "XAG/USD": {
+   "title": "XAG/USD",
+   "special": false,
+   "name": "XAG/USD",
+   "description": "Spot silver",
+   "historical_filename": "XAGUSD",
+   "pipValue": 0.01,
+   "base_currency": "XAG",
+   "quote_currency": "USD",
+   "commodities_per_contract": "1",
+   "tag_list": [
+    "CFD_INSTRUMENTS",
+    "FX_CFD_ALL",
+    "GLOBAL_ACCOUNTS"
+   ],
+   "history_start_tick": "1406309521296",
+   "history_start_10sec": "1406309540000",
+   "history_start_60sec": "1406309580000",
+   "history_start_60min": "1406311200000",
+   "history_start_day": "0",
+   "unit": null,
+   "volume": 1
+  },
+  "XPT.CMD/USD": {
+   "title": "XPT.CMD/USD",
+   "special": false,
+   "name": "XPT.CMD/USD",
+   "description": "Platinum",
+   "historical_filename": "XPTCMDUSD",
+   "pipValue": 0.01,
+   "base_currency": "XPT.CMD",
+   "quote_currency": "USD",
+   "commodities_per_contract": null,
+   "tag_list": [
+    "CFD_INSTRUMENTS",
+    "FX_CFD_ALL"
+   ],
+   "history_start_tick": "1635724800046",
+   "history_start_10sec": "1644942180000",
+   "history_start_60sec": "1635724800000",
+   "history_start_60min": "1635724800000",
+   "history_start_day": "0",
+   "unit": null
+  },
+  "E_SandP-500": {
+   "title": "USA500.IDX/USD",
+   "special": false,
+   "name": "USA500.IDX/USD",
+   "description": "USA 500 Index",
+   "historical_filename": "USA500IDXUSD",
+   "pipValue": 0.01,
+   "base_currency": "USA500.IDX",
+   "quote_currency": "USD",
+   "commodities_per_contract": "1",
+   "tag_list": [
+    "CFD_INSTRUMENTS",
+    "FX_CFD_ALL"
+   ],
+   "history_start_tick": "1326672007771",
+   "history_start_10sec": "1339672190000",
+   "history_start_60sec": "1326672000000",
+   "history_start_60min": "1326672000000",
+   "history_start_day": "0",
+   "unit": null
+  },
+  "E_DAAX": {
+   "title": "DEU.IDX/EUR",
+   "special": false,
+   "name": "DEU.IDX/EUR",
+   "description": "Germany 40 Index",
+   "historical_filename": "DEUIDXEUR",
+   "pipValue": 0.01,
+   "base_currency": "DEU.IDX",
+   "quote_currency": "EUR",
+   "commodities_per_contract": "1",
+   "tag_list": [
+    "CFD_INSTRUMENTS",
+    "FX_CFD_ALL"
+   ],
+   "history_start_tick": "1339672480732",
+   "history_start_10sec": "1339672470000",
+   "history_start_60sec": "1381734120",
+   "history_start_60min": "1339671600000",
+   "history_start_day": "0",
+   "unit": null
+  },
+  "E_N225Jap": {
+   "title": "JPN.IDX/JPY",
+   "special": false,
+   "name": "JPN.IDX/JPY",
+   "description": "Japan 225",
+   "historical_filename": "JPNIDXJPY",
+   "pipValue": 0.01,
+   "base_currency": "JPN.IDX",
+   "quote_currency": "JPY",
+   "commodities_per_contract": "1",
+   "tag_list": [
+    "CFD_INSTRUMENTS",
+    "FX_CFD_ALL"
+   ],
+   "history_start_tick": "1339695985265",
+   "history_start_10sec": "1339670150000",
+   "history_start_60sec": "1339670100000",
+   "history_start_60min": "1339668000000",
+   "history_start_day": "0",
+   "unit": null
+  },
+  "E_Light": {
+   "title": "LIGHT.CMD/USD",
+   "special": false,
+   "name": "LIGHT.CMD/USD",
+   "description": "US Light Crude Oil",
+   "historical_filename": "LIGHTCMDUSD",
+   "pipValue": 0.01,
+   "base_currency": "LIGHT.CMD",
+   "quote_currency": "USD",
+   "commodities_per_contract": "100",
+   "tag_list": [
+    "CFD_INSTRUMENTS",
+    "FX_CFD_ALL"
+   ],
+   "history_start_tick": "1357019042453",
+   "history_start_10sec": "1388534400000",
+   "history_start_60sec": "1324377060000",
+   "history_start_60min": "1320930000000",
+   "history_start_day": "0",
+   "unit": null
+  },
+  "COPPER.CMD/USD": {
+   "title": "COPPER.CMD/USD",
+   "special": false,
+   "name": "COPPER.CMD/USD",
+   "description": "High Grade Copper",
+   "historical_filename": "COPPERCMDUSD",
+   "pipValue": 0.001,
+   "base_currency": "COPPER.CMD",
+   "quote_currency": "USD",
+   "commodities_per_contract": "100",
+   "tag_list": [
+    "CFD_INSTRUMENTS",
+    "FX_CFD_ALL"
+   ],
+   "history_start_tick": "1330560168552",
+   "history_start_10sec": "1412856720000",
+   "history_start_60sec": "1330560180000",
+   "history_start_60min": "1330563600000",
+   "history_start_day": "0",
+   "unit": null
+  },
+  "NVDA.US/USD": {
+   "title": "NVDA.US/USD",
+   "special": false,
+   "name": "NVDA.US/USD",
+   "description": "NVIDIA CORP",
+   "historical_filename": "NVDAUSUSD",
+   "pipValue": 0.01,
+   "base_currency": "NVDA.US",
+   "quote_currency": "USD",
+   "commodities_per_contract": null,
+   "tag_list": [
+    "CFD_INSTRUMENTS",
+    "FX_CFD_ALL"
+   ],
+   "history_start_tick": "1488391979927",
+   "history_start_10sec": "1488391970000",
+   "history_start_60sec": "1488391920000",
+   "history_start_60min": "1488391200000",
+   "history_start_day": "0",
+   "unit": null
+  },
+  "SAP.DE/EUR": {
+   "title": "SAP.DE/EUR",
+   "special": false,
+   "name": "SAP.DE/EUR",
+   "description": "SAP AG",
+   "historical_filename": "SAPDEEUR",
+   "pipValue": 0.01,
+   "base_currency": "SAP.DE",
+   "quote_currency": "EUR",
+   "commodities_per_contract": null,
+   "tag_list": [
+    "CFD_INSTRUMENTS",
+    "FX_CFD_ALL"
+   ],
+   "history_start_tick": "1429167626013",
+   "history_start_10sec": "1453795530000",
+   "history_start_60sec": "1429167600000",
+   "history_start_60min": "1294041600000",
+   "history_start_day": "0",
+   "unit": null
+  },
+  "SPY.US/USD": {
+   "title": "SPY.US/USD",
+   "special": false,
+   "name": "SPY.US/USD",
+   "description": "SPDR S&P 500 ETF",
+   "historical_filename": "SPYUSUSD",
+   "pipValue": 0.01,
+   "base_currency": "SPY.US",
+   "quote_currency": "USD",
+   "commodities_per_contract": null,
+   "tag_list": [
+    "CFD_INSTRUMENTS",
+    "FX_CFD_ALL"
+   ],
+   "history_start_tick": "1487258814811",
+   "history_start_10sec": "1487258810000",
+   "history_start_60sec": "1487258760000",
+   "history_start_60min": "1487257200000",
+   "history_start_day": "0",
+   "unit": null
+  },
+  "BTC/USD": {
+   "title": "BTC/USD",
+   "special": false,
+   "name": "BTC/USD",
+   "description": "Bitcoin vs US Dollar",
+   "historical_filename": "BTCUSD",
+   "pipValue": 1,
+   "base_currency": "BTC",
+   "quote_currency": "USD",
+   "commodities_per_contract": null,
+   "tag_list": [
+    "CFD_INSTRUMENTS",
+    "FX_CFD_ALL"
+   ],
+   "history_start_tick": "1494201599058",
+   "history_start_10sec": "1514477470000",
+   "history_start_60sec": "1494201540000",
+   "history_start_60min": "1494198000000",
+   "history_start_day": "0",
+   "unit": null
+  },
+  "BUND.TR/EUR": {
+   "title": "BUND.TR/EUR",
+   "special": false,
+   "name": "BUND.TR/EUR",
+   "description": "Euro Bund",
+   "historical_filename": "BUNDTREUR",
+   "pipValue": 0.01,
+   "base_currency": "BUND.TR",
+   "quote_currency": "EUR",
+   "commodities_per_contract": null,
+   "tag_list": [
+    "CFD_INSTRUMENTS",
+    "FX_CFD_ALL"
+   ],
+   "history_start_tick": "1462168862736",
+   "history_start_10sec": "1525245940000",
+   "history_start_60sec": "1462168860000",
+   "history_start_60min": "1462168800000",
+   "history_start_day": "0",
+   "unit": null
+  },
+  "DUK+/EUR": {
+   "title": "DUK+/EUR",
+   "special": false,
+   "name": "DUK+/EUR",
+   "description": "Dukascoin vs Euro",
+   "historical_filename": null,
+   "pipValue": 0.1,
+   "base_currency": "DUK+",
+   "quote_currency": "EUR",
+   "commodities_per_contract": null,
+   "tag_list": [
+    ""
+   ],
+   "history_start_tick": "1551359646000",
+   "history_start_10sec": "1568703390000",
+   "history_start_60sec": "1551359640000",
+   "history_start_60min": "1551358800000",
+   "history_start_day": "0",
+   "unit": "DUK+"
+  }
+ },
+ "groups": {
+  "BND_CFD": {
+   "id": "BND_CFD",
+   "title": "Bonds (CFD)",
+   "instruments": [
+    "BUND.TR/EUR"
+   ]
+  },
+  "VCCY": {
+   "id": "VCCY",
+   "title": "Crypto (CFD)",
+   "instruments": [
+    "BTC/USD"
+   ]
+  },
+  "CMD_ENERGY": {
+   "id": "CMD_ENERGY",
+   "title": "Energy",
+   "parent": "CMD",
+   "instruments": [
+    "E_Light"
+   ]
+  },
+  "CMD_METALS": {
+   "id": "CMD_METALS",
+   "title": "Metals",
+   "parent": "CMD",
+   "instruments": [
+    "COPPER.CMD/USD",
+    "XPT.CMD/USD"
+   ]
+  },
+  "ETF_CFD_US": {
+   "id": "ETF_CFD_US",
+   "title": "US",
+   "parent": "ETF_CFD",
+   "instruments": [
+    "SPY.US/USD"
+   ]
+  },
+  "FX_CROSSES": {
+   "id": "FX_CROSSES",
+   "title": "Crosses",
+   "parent": "FX",
+   "instruments": [
+    "EUR/GBP",
+    "USD/TRY"
+   ]
+  },
+  "FX_MAJORS": {
+   "id": "FX_MAJORS",
+   "title": "Majors",
+   "parent": "FX",
+   "instruments": [
+    "EUR/USD",
+    "USD/JPY"
+   ]
+  },
+  "FX_METALS": {
+   "id": "FX_METALS",
+   "title": "Metals",
+   "parent": "FX",
+   "instruments": [
+    "XAG/USD",
+    "XAU/USD"
+   ]
+  },
+  "IDX_AMERICA": {
+   "id": "IDX_AMERICA",
+   "title": "America",
+   "parent": "IDX",
+   "instruments": [
+    "E_SandP-500"
+   ]
+  },
+  "IDX_ASIA": {
+   "id": "IDX_ASIA",
+   "title": "Asia / Pacific",
+   "parent": "IDX",
+   "instruments": [
+    "E_N225Jap"
+   ]
+  },
+  "IDX_EUROPE": {
+   "id": "IDX_EUROPE",
+   "title": "Europe",
+   "parent": "IDX",
+   "instruments": [
+    "E_DAAX"
+   ]
+  },
+  "Germany": {
+   "id": "Germany",
+   "title": "Germany",
+   "parent": "STCK_CFD",
+   "instruments": [
+    "SAP.DE/EUR"
+   ]
+  },
+  "US": {
+   "id": "US",
+   "title": "US",
+   "parent": "STCK_CFD",
+   "instruments": [
+    "NVDA.US/USD"
+   ]
+  },
+  "STCK_CFD": {
+   "id": "STCK_CFD",
+   "title": "Stocks (CFD)"
+  },
+  "IDX": {
+   "id": "IDX",
+   "title": "Indices (CFD)"
+  },
+  "FX": {
+   "id": "FX",
+   "title": "Forex"
+  },
+  "ETF_CFD": {
+   "id": "ETF_CFD",
+   "title": "ETF (CFD)"
+  },
+  "CMD": {
+   "id": "CMD",
+   "title": "Commodities (CFD)"
+  }
+ }
+}

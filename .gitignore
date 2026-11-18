@@ -27,3 +27,6 @@ env/
 .idea/
 .vscode/
 logs/
+
+# Datos históricos (por si alguien pone DATA_DIR dentro del repo)
+sentinel_datos/

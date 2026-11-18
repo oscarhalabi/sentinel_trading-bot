@@ -40,6 +40,8 @@ Cada fase se diseña (brainstorming) por separado. Fase 2: mapa en
 - `instances/<usuario>.env` : un archivo por usuario (no se commitea). Plantilla: `instances/example.env`.
 - `migrations/` : SQL de Supabase (compartido con producción). Las nuestras: `n1_NNN_*.sql`.
 - `localdb/migrations/` : SQL del Postgres local de este bot.
+- `datos/` : datos históricos de mercado (Fase 2A, en la laptop): `python -m datos bajar|velas|verificar|catalogo`,
+  consulta con `datos.consulta`. Guía: `docs/datos-de-mercado.md` (skill `datos-mercado`).
 - `docs/` : documentación en lenguaje sencillo (`como-funciona.md`, `convivencia-y-reemplazo.md`).
 
 ## REGLAS DE CONVIVENCIA CON PRODUCCIÓN (no negociables)
@@ -100,7 +102,8 @@ Detalle y motivos en `docs/convivencia-y-reemplazo.md`.
   Léelo al empezar. El almacén local de Claude (`~/.claude/projects/.../memory/`) es solo
   un espejo por máquina; ante divergencia gana `docs/memory/`.
 - **Skills** en `.claude/skills/<nombre>/SKILL.md`:
-  `lanzar-bot-nuevo`, `migracion-supabase-segura`, `flujo-git-equipo`, `actualizar-memoria`.
+  `lanzar-bot-nuevo`, `migracion-supabase-segura`, `flujo-git-equipo`, `actualizar-memoria`,
+  `datos-mercado`.
   Si aparece un trabajo repetido, proponer crear una skill nueva.
 
 ## Reglas de mantenimiento

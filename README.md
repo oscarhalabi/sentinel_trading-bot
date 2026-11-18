@@ -20,8 +20,9 @@ de hacer nada con procesos o tareas, lee [`docs/convivencia-y-reemplazo.md`](doc
 | [`docs/como-funciona.md`](docs/como-funciona.md) | Las piezas del sistema y cómo se hablan |
 | [`docs/convivencia-y-reemplazo.md`](docs/convivencia-y-reemplazo.md) | Cómo convive con producción y cómo se hará el cambio (y la vuelta atrás) |
 | [`CLAUDE.md`](CLAUDE.md) | Reglas de trabajo del proyecto (para personas y para Claude) |
+| [`docs/datos-de-mercado.md`](docs/datos-de-mercado.md) | Datos históricos de mercado: qué hay, cómo se bajan y cómo se consultan |
 | [`docs/memory/`](docs/memory/MEMORY.md) | Memoria del proyecto: decisiones y datos importantes |
-| `.claude/skills/` | Recetas paso a paso (lanzar el bot, migraciones, flujo git, memoria) |
+| `.claude/skills/` | Recetas paso a paso (lanzar el bot, migraciones, flujo git, memoria, datos de mercado) |
 
 ## Arrancar en 5 pasos
 
