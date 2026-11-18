@@ -45,7 +45,10 @@ def _numero(texto) -> tuple[float | None, str]:
 
 
 def _momento(texto: str) -> tuple[datetime, bool]:
-    """(ts_evento en UTC, hora_exacta). Sin hora o a medianoche de NY → día sin hora exacta."""
+    """(ts_evento en UTC, hora_exacta). Sin hora o a medianoche de NY → día sin hora exacta.
+
+    Heurística: el JSON no distingue "All Day"/"Tentative"; se supone que 00:00 NY no es una hora real.
+    """
     dt = datetime.fromisoformat(texto)
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=NY)
@@ -65,14 +68,18 @@ def normalizar_ff(cuerpo: bytes, ts_foto: datetime, mapa_eventos: dict,
         divisa = it.get("country")
         if divisa not in divisas:
             continue
+        festivo = str(it.get("impact", "")).lower() == "holiday"
         impacto = _IMPACTO.get(str(it.get("impact", "")).lower(), "bajo")
-        if _ORDEN_IMPACTO[impacto] < _ORDEN_IMPACTO[impacto_min]:
+        # Los festivos se conservan siempre (mercados cerrados, poca liquidez).
+        if not festivo and _ORDEN_IMPACTO[impacto] < _ORDEN_IMPACTO[impacto_min]:
             continue
         ts_evento, exacta = _momento(it["date"])
         prevision, u1 = _numero(it.get("forecast"))
         anterior, u2 = _numero(it.get("previous"))
         real, u3 = _numero(it.get("actual"))
         evento, categoria = normalizar_evento("forexfactory", it["title"], mapa_eventos)
+        if festivo:
+            categoria = "festivo"
         filas.append({
             "ts_evento": ts_evento, "ts_anunciado": ts_foto, "ts_conocido": ts_evento,
             "ts_version": ts_foto, "ts_foto": ts_foto, "fuente": "forexfactory",

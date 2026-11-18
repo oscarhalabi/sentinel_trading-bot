@@ -83,7 +83,6 @@ def test_ff_parsea_unidades():
 def test_filtra_divisa_e_impacto():
     titulos = {f["evento_fuente"] for f in norm()}
     assert "Other Country" not in titulos and "Minor Data" not in titulos
-    assert "Bank Holiday" not in titulos   # Holiday = impacto bajo, por debajo del mínimo
 
 
 def test_dos_fotos_sin_cambios_no_duplican(cfg):
@@ -125,3 +124,8 @@ def test_guarda_los_dos_crudos_y_un_fallo_no_pierde_el_otro(cfg):
     assert (cfg.data_dir / "calendario/fuente=forexfactory/simbolo=USD/anio=2026.parquet").exists()
     crudos = list(listar_crudos(cfg.data_dir, "forexfactory"))
     assert len(crudos) == 1 and leer_crudo(cfg.data_dir, crudos[0].ruta) == FIX.read_bytes()
+
+
+def test_festivo_se_conserva():
+    f = por_titulo(norm(), "Bank Holiday")
+    assert f["impacto"] == "bajo" and f["categoria"] == "festivo" and not f["hora_exacta"]
