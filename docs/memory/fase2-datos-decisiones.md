@@ -43,10 +43,10 @@ Rama `fase2/datos-historicos`, PR oscarhalabi/sentinel_trading-bot#3.
 
 - Código de 2A hecho en la rama `datos/base-almacen` (tareas 1–10 del plan, por subagentes con revisión por
   tarea y revisión final). Tests de `datos/`: 168 pasan con Postgres de prueba (155 + 13 omitidos sin él).
-- **Falta la Task 11 en la laptop**: formato real de la lista de instrumentos de Dukascopy (el parser es
-  provisional), primera descarga real, comparar un día de oro con un gráfico, prioridad 1 completa,
-  `verificar`, medir velocidad y tamaños, `catalogo reconstruir`, docs `docs/datos-de-mercado.md`,
-  skill `datos-mercado` y la línea de `datos/` en CLAUDE.md. Ahí se corre también la suite completa (Windows).
+- **Task 11 en la laptop (2026-11-12 → 18):** hecha salvo la prioridad 1 completa (solo XAUUSD; el
+  resto espera a decidir la vía de S3) y la comparación de un día con TradingView (la hace Oscar).
+  Hay `docs/datos-de-mercado.md`, la skill `datos-mercado` y la línea de `datos/` en CLAUDE.md. La
+  suite completa pasa en Windows (323 + 2 omitidas).
 - Decisiones tomadas al implementar (Rulings del ledger de ejecución):
   - `bajar` decide qué falta mirando siempre los archivos y manifiestos; el catálogo solo se escribe.
   - La consulta nunca devuelve una vela con `ts_cierre` posterior a `hasta`, y `conectar()` también respeta
@@ -122,12 +122,15 @@ Rama `fase2/datos-historicos`, PR oscarhalabi/sentinel_trading-bot#3.
 
 ## Pendientes
 
-1. ~~Spec y plan de 2A~~ (PR #3 mergeado). Código de 2A en `datos/base-almacen`; falta la Task 11 en la laptop.
+1. ~~Spec y plan de 2A~~ (PR #3 mergeado). Código de 2A en `datos/base-almacen`, con la Task 11 hecha:
+   falta el PR a `main`, comparar un día de XAUUSD con TradingView y bajar el resto de la prioridad 1
+   (antes, decidir si se usa la exportación de Dukascopy por S3: ~69 días de reloj por HTTP).
 2. Claves de R2 y FRED en el `.env` de la laptop (se usan en 2B y 2C, no en 2A).
 3. El PR #3 lo abrió Claude cuando Oscar reconectó GitHub (antes daba 403). La rama
    `claude/fase2-historical-data-xau-rp4wa5` no se pudo borrar desde la sesión: hay que borrarla en GitHub.
 4. Remote Control con la laptop: la carpeta aparece en la lista pero no se ofrece a las sesiones
    en la nube (app de Windows). Mientras tanto, lo que exige la laptop se hace en una sesión local.
+5. Afinar el umbral de `salto` de `verificar` (36.505 avisos en XAUUSD, picos de un tick).
 
 **Cómo aplicar:** antes de tocar `datos/`, leer la spec del subproyecto. Si un supuesto resulta
 falso (URL de instrumentos, decimales, velocidad, tamaños), anotarlo aquí.
