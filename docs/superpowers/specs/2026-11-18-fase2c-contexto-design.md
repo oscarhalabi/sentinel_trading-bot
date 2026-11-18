@@ -78,8 +78,9 @@ inflacion, tipos, pib, consumo, actividad, vivienda, balanza, otros), `impacto` 
 - **Dato real:** `ts_conocido = ts_evento`. La latencia del bot **no** se guarda: es un parámetro de
   la consulta (§6), por defecto 5 s.
 - **Previsión:** se guardan las dos. La de la API, con `prevision_es_pit = false` (puede ser la
-  última que guardó el proveedor). La de cada foto de FF, como fila propia con
-  `ts_conocido = ts_foto` y `prevision_es_pit = true`.
+  última que guardó el proveedor). La de cada foto de FF, como versión propia con
+  `ts_version = ts_foto` y `prevision_es_pit = true` (la previsión se conoce desde `ts_version`; `ts_conocido` es
+  solo para el dato real).
 - **Existencia del evento (dos instantes por fila; decisión de Claude tras la revisión):** la consulta
   muestra el evento desde `ts_anunciado` con `real`/`sorpresa` vacíos, y el dato real solo desde
   `ts_conocido + latencia`. Así funciona "evitar" (saber qué viene) sin ver el futuro.
