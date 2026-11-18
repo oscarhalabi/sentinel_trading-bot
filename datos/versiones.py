@@ -27,11 +27,13 @@ def _iguales(a, b, tolerancia: float) -> bool:
 
 def versionar(previas: pd.DataFrame, nuevas: pd.DataFrame, clave: list[str],
               campos: list[str], ts_version: datetime,
-              tolerancia: float = 1e-9) -> pd.DataFrame:
+              tolerancia: float = 1e-6) -> pd.DataFrame:
     """Devuelve `previas` + las filas de `nuevas` cuyos `campos` difieren de la última versión
     (mayor `ts_version`) de su `clave`, con `ts_version` puesto. No modifica las entradas.
 
-    Floats con tolerancia relativa y absoluta `tolerancia`; nulos (None, NaN, NaT) iguales entre sí.
+    Floats con tolerancia relativa y absoluta `tolerancia` (1e-6: tapa el ruido de redondeo de
+    las APIs; las cifras económicas tienen pocos decimales, así que no esconde un cambio real);
+    nulos (None, NaN, NaT) iguales entre sí.
     """
     if ts_version.tzinfo is None:
         raise ValueError("ts_version debe llevar zona horaria (UTC)")

@@ -68,13 +68,11 @@ def test_versionar_compara_con_la_ultima_version():
 def test_versionar_ignora_ruido_de_redondeo():
     k = ("CPI", _ts(2024, 1, 11, 13, 30))
     v1 = versionar(_vacias(), _nuevas([(*k, 0.3, None)]), CLAVE, CAMPOS, T1)
-    # Ruido de coma flotante típico con la tolerancia por defecto (1e-9).
+    # Ruido de redondeo de la API con la tolerancia por defecto: sin fila nueva.
+    assert len(versionar(v1, _nuevas([(*k, 0.30000001, None)]), CLAVE, CAMPOS, T2)) == 1
     assert len(versionar(v1, _nuevas([(*k, 0.1 + 0.2, None)]), CLAVE, CAMPOS, T2)) == 1
-    # 0.3 frente a 0.30000001 con una tolerancia de 1e-6.
-    assert len(versionar(v1, _nuevas([(*k, 0.30000001, None)]), CLAVE, CAMPOS, T2,
-                         tolerancia=1e-6)) == 1
     # Un cambio de verdad sí entra.
-    assert len(versionar(v1, _nuevas([(*k, 0.4, None)]), CLAVE, CAMPOS, T2)) == 2
+    assert len(versionar(v1, _nuevas([(*k, 0.31, None)]), CLAVE, CAMPOS, T2)) == 2
 
 
 def test_versionar_nulos_iguales():
