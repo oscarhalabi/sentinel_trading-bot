@@ -1,0 +1,9 @@
+[
+  {"title": "Non-Farm Employment Change", "country": "USD", "date": "2026-11-20T08:30:00-05:00", "impact": "High", "forecast": "250K", "previous": "227K"},
+  {"title": "Unemployment Rate", "country": "USD", "date": "2026-11-20T08:30:00-05:00", "impact": "High", "forecast": "4.1%", "previous": "4.2%"},
+  {"title": "CPI m/m", "country": "EUR", "date": "2026-11-20T04:00:00-05:00", "impact": "Medium", "forecast": "0.3%", "previous": "-0.3M"},
+  {"title": "Bank Holiday", "country": "JPY", "date": "2026-11-23T00:00:00-05:00", "impact": "Holiday", "forecast": "", "previous": ""},
+  {"title": "Tentative Event", "country": "GBP", "date": "2026-11-21T00:00:00-05:00", "impact": "High", "forecast": "", "previous": ""},
+  {"title": "Minor Data", "country": "USD", "date": "2026-11-20T10:00:00-05:00", "impact": "Low", "forecast": "1.0", "previous": "0.9"},
+  {"title": "Other Country", "country": "BRL", "date": "2026-11-20T10:00:00-05:00", "impact": "High", "forecast": "", "previous": ""}
+]
