@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 from typing import Mapping
@@ -26,6 +26,17 @@ class Config:
     # (2026-11-12); 3 y 3 bajó XAUUSD entero sin bloqueos (2026-11-14).
     dukas_max_paralelo: int = 3
     dukas_max_por_segundo: float = 3.0
+    # Contexto (Fase 2C). Las claves solo viven en el .env de la laptop y no salen en repr.
+    fred_api_key: str = field(default="", repr=False)
+    fmp_api_key: str = field(default="", repr=False)
+    eodhd_api_key: str = field(default="", repr=False)
+    te_api_key: str = field(default="", repr=False)
+    ff_cada_horas: float = 4.0
+    fuente_calendario: str = "fmp"
+    fuente_corporativo: str = "fmp"
+
+
+FUENTES_API = ("fmp", "eodhd", "te")
 
 
 def _leer_entorno() -> dict[str, str]:
@@ -79,6 +90,28 @@ def cargar_config(entorno: Mapping[str, str] | None = None) -> Config:
     if not por_segundo > 0:
         raise ConfigInvalida(f"DUKAS_MAX_POR_SEGUNDO debe ser un número mayor que 0, no {texto_ps!r}.")
 
+    texto_ff = env.get("DATOS_FF_CADA_HORAS", "").strip() or "4"
+    try:
+        ff_cada_horas = float(texto_ff)
+    except ValueError:
+        ff_cada_horas = 0.0
+    if not ff_cada_horas > 0:
+        raise ConfigInvalida(f"DATOS_FF_CADA_HORAS debe ser un número mayor que 0, no {texto_ff!r}.")
+
+    fuentes = {}
+    for var in ("DATOS_FUENTE_CALENDARIO", "DATOS_FUENTE_CORPORATIVO"):
+        valor = env.get(var, "").strip().lower() or "fmp"
+        if valor not in FUENTES_API:
+            raise ConfigInvalida(f"{var} debe ser una de {', '.join(FUENTES_API)}, no {valor!r}.")
+        fuentes[var] = valor
+
     return Config(data_dir=data_dir, pg_dsn=env.get("DATOS_PG_DSN", ""),
                   disco_min_gb=disco_min_gb, corte_reserva=corte,
-                  dukas_max_paralelo=paralelo, dukas_max_por_segundo=por_segundo)
+                  dukas_max_paralelo=paralelo, dukas_max_por_segundo=por_segundo,
+                  fred_api_key=env.get("FRED_API_KEY", "").strip(),
+                  fmp_api_key=env.get("FMP_API_KEY", "").strip(),
+                  eodhd_api_key=env.get("EODHD_API_KEY", "").strip(),
+                  te_api_key=env.get("TE_API_KEY", "").strip(),
+                  ff_cada_horas=ff_cada_horas,
+                  fuente_calendario=fuentes["DATOS_FUENTE_CALENDARIO"],
+                  fuente_corporativo=fuentes["DATOS_FUENTE_CORPORATIVO"])

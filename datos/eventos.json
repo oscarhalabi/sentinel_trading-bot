@@ -1,0 +1,143 @@
+{
+  "_nota": "provisional, se ajusta con respuestas reales en la laptop (Task 12)",
+  "forexfactory:Non-Farm Employment Change": {
+    "evento": "US_NFP",
+    "categoria": "empleo"
+  },
+  "fmp:Nonfarm Payrolls": {
+    "evento": "US_NFP",
+    "categoria": "empleo"
+  },
+  "eodhd:Non Farm Payrolls": {
+    "evento": "US_NFP",
+    "categoria": "empleo"
+  },
+  "forexfactory:Unemployment Rate": {
+    "evento": "US_DESEMPLEO",
+    "categoria": "empleo"
+  },
+  "forexfactory:CPI m/m": {
+    "evento": "US_IPC",
+    "categoria": "inflacion"
+  },
+  "eodhd:Inflation Rate MoM": {
+    "evento": "US_IPC",
+    "categoria": "inflacion"
+  },
+  "fmp:CPI MoM": {
+    "evento": "US_IPC",
+    "categoria": "inflacion"
+  },
+  "forexfactory:CPI y/y": {
+    "evento": "US_IPC_ANUAL",
+    "categoria": "inflacion"
+  },
+  "eodhd:Inflation Rate YoY": {
+    "evento": "US_IPC_ANUAL",
+    "categoria": "inflacion"
+  },
+  "fmp:CPI YoY": {
+    "evento": "US_IPC_ANUAL",
+    "categoria": "inflacion"
+  },
+  "forexfactory:Core CPI m/m": {
+    "evento": "US_IPC_SUBYACENTE",
+    "categoria": "inflacion"
+  },
+  "eodhd:Core Inflation Rate MoM": {
+    "evento": "US_IPC_SUBYACENTE",
+    "categoria": "inflacion"
+  },
+  "fmp:Core CPI MoM": {
+    "evento": "US_IPC_SUBYACENTE",
+    "categoria": "inflacion"
+  },
+  "forexfactory:Core PCE Price Index m/m": {
+    "evento": "US_PCE",
+    "categoria": "inflacion"
+  },
+  "fmp:Core PCE Price Index MoM": {
+    "evento": "US_PCE",
+    "categoria": "inflacion"
+  },
+  "eodhd:PCE Price Index MoM": {
+    "evento": "US_PCE",
+    "categoria": "inflacion"
+  },
+  "forexfactory:Advance GDP q/q": {
+    "evento": "US_PIB",
+    "categoria": "crecimiento"
+  },
+  "eodhd:GDP Growth Rate QoQ Adv": {
+    "evento": "US_PIB",
+    "categoria": "crecimiento"
+  },
+  "fmp:GDP QoQ": {
+    "evento": "US_PIB",
+    "categoria": "crecimiento"
+  },
+  "forexfactory:Retail Sales m/m": {
+    "evento": "US_VENTAS_MINORISTAS",
+    "categoria": "consumo"
+  },
+  "fmp:Retail Sales MoM": {
+    "evento": "US_VENTAS_MINORISTAS",
+    "categoria": "consumo"
+  },
+  "forexfactory:ISM Manufacturing PMI": {
+    "evento": "US_ISM_MANUFACTURA",
+    "categoria": "actividad"
+  },
+  "forexfactory:ISM Services PMI": {
+    "evento": "US_ISM_SERVICIOS",
+    "categoria": "actividad"
+  },
+  "forexfactory:Federal Funds Rate": {
+    "evento": "US_FED_TIPOS",
+    "categoria": "banco_central"
+  },
+  "eodhd:Fed Interest Rate Decision": {
+    "evento": "US_FED_TIPOS",
+    "categoria": "banco_central"
+  },
+  "forexfactory:Unemployment Claims": {
+    "evento": "US_SOLICITUDES_DESEMPLEO",
+    "categoria": "empleo"
+  },
+  "eodhd:Initial Jobless Claims": {
+    "evento": "US_SOLICITUDES_DESEMPLEO",
+    "categoria": "empleo"
+  },
+  "forexfactory:Main Refinancing Rate": {
+    "evento": "EU_BCE_TIPOS",
+    "categoria": "banco_central"
+  },
+  "eodhd:ECB Interest Rate Decision": {
+    "evento": "EU_BCE_TIPOS",
+    "categoria": "banco_central"
+  },
+  "forexfactory:Official Bank Rate": {
+    "evento": "UK_BOE_TIPOS",
+    "categoria": "banco_central"
+  },
+  "eodhd:BoE Interest Rate Decision": {
+    "evento": "UK_BOE_TIPOS",
+    "categoria": "banco_central"
+  },
+  "forexfactory:CPI Flash Estimate y/y": {
+    "evento": "EU_IPC",
+    "categoria": "inflacion"
+  },
+  "eodhd:Inflation Rate YoY Flash": {
+    "evento": "EU_IPC",
+    "categoria": "inflacion"
+  },
+  "forexfactory:Flash GDP q/q": {
+    "evento": "EU_PIB",
+    "categoria": "crecimiento"
+  },
+  "eodhd:GDP Growth Rate QoQ Flash": {
+    "evento": "EU_PIB",
+    "categoria": "crecimiento"
+  }
+}
