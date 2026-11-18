@@ -72,7 +72,7 @@ existía, a esa hora), `ts_conocido` (desde cuándo se conocía el dato real), `
 guardó esta versión de la fila), `fuente`, `id_fuente`, `pais`,
 `divisa`, `evento` (nombre normalizado), `evento_fuente` (nombre original), `categoria` (empleo,
 inflacion, tipos, pib, consumo, actividad, vivienda, balanza, otros), `impacto` (bajo/medio/alto),
-`programado` (bool), `real`, `prevision`, `anterior`, `anterior_revisado`, `unidad`,
+`programado` (bool), `hora_exacta` (bool; falso si la fuente solo da la fecha o dice "todo el día"/"tentativo": esos eventos no cuentan como hora exacta para "evitar"), `real`, `prevision`, `anterior`, `anterior_revisado`, `unidad`,
 `prevision_es_pit` (bool), `ts_foto` (solo fuente `forexfactory`: hora de la foto).
 
 - **Dato real:** `ts_conocido = ts_evento`. La latencia del bot **no** se guarda: es un parámetro de
