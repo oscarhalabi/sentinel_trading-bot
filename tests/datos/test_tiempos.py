@@ -81,8 +81,8 @@ def test_estimar_publicacion_trimestral_y_semanal():
     icsa = _serie(ctx, "series_alfred", "ICSA")
     # GDP del 2.º trimestre (periodo 1990-04-01): fin 1990-06-30 + 30 días = 1990-07-30.
     assert estimar_publicacion(date(1990, 4, 1), gdp) == utc(1990, 7, 30, 12, 30)
-    # ICSA semana del sábado 1990-01-06: fin 1990-01-12 + 5 días = 1990-01-17.
-    assert estimar_publicacion(date(1990, 1, 6), icsa) == utc(1990, 1, 17, 13, 30)
+    # ICSA de la semana que termina el sábado 1990-01-06 + 5 días = jueves 1990-01-11.
+    assert estimar_publicacion(date(1990, 1, 6), icsa) == utc(1990, 1, 11, 13, 30)
 
 
 def test_detectar_carga_en_bloque():
@@ -95,6 +95,26 @@ def test_detectar_carga_en_bloque():
     marca = detectar_carga_en_bloque(todo)
     assert marca.dtype == bool
     assert list(marca.index) == list(todo.index)
+    assert marca.iloc[:300].all()
+    assert not marca.iloc[300:].any()
+
+
+def test_revision_general_no_es_carga_en_bloque():
+    # 300 periodos, cada uno con su primera versión propia, y una revisión general posterior
+    # (como GDP en 2013): esa revisión se publicó ese día, no se estima hacia atrás.
+    periodos = pd.date_range("1960-01-01", periods=300, freq="MS").date
+    primeras = [p + pd.Timedelta(days=40) for p in periodos]
+    df = pd.DataFrame({"periodo": list(periodos) * 2,
+                       "realtime_start": primeras + [date(2013, 7, 31)] * 300})
+    assert not detectar_carga_en_bloque(df).any()
+
+
+def test_carga_en_bloque_solo_primeras_versiones():
+    # Carga en bloque en 1990 y luego una revisión general en 2013: solo las de 1990 se marcan.
+    periodos = pd.date_range("1960-01-01", periods=300, freq="MS").date
+    df = pd.DataFrame({"periodo": list(periodos) * 2,
+                       "realtime_start": [date(1990, 5, 4)] * 300 + [date(2013, 7, 31)] * 300})
+    marca = detectar_carga_en_bloque(df)
     assert marca.iloc[:300].all()
     assert not marca.iloc[300:].any()
 

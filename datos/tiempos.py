@@ -64,7 +64,7 @@ def publicacion_alfred(fecha_vintage: date, serie_conf: dict) -> datetime:
 
 def _fin_periodo(periodo: date, frecuencia: str) -> date:
     if frecuencia == "w":
-        return periodo + timedelta(days=6)
+        return periodo  # FRED fecha la semana por el sábado en que termina
     if frecuencia == "q":
         mes_fin = (periodo.month - 1) // 3 * 3 + 3
         return date(periodo.year, mes_fin, calendar.monthrange(periodo.year, mes_fin)[1])
@@ -76,7 +76,7 @@ def _fin_periodo(periodo: date, frecuencia: str) -> date:
 
 def estimar_publicacion(periodo: date, serie_conf: dict) -> datetime:
     """Publicación estimada de un periodo cargado en bloque: fin del periodo (mes, trimestre
-    o semana según `frecuencia`, 'm' por defecto) + `retraso_tipico_dias`, a la hora de la serie."""
+    o semana (la fecha ya es el fin) según `frecuencia`, 'm' por defecto) + `retraso_tipico_dias`, a la hora de la serie."""
     fin = _fin_periodo(periodo, serie_conf.get("frecuencia", "m"))
     dia = fin + timedelta(days=serie_conf["retraso_tipico_dias"])
     return local_a_utc(dia, serie_conf["hora"], serie_conf["zona"])
@@ -84,16 +84,22 @@ def estimar_publicacion(periodo: date, serie_conf: dict) -> datetime:
 
 def detectar_carga_en_bloque(vintages: pd.DataFrame, periodo: str = "periodo",
                              publicacion: str = "realtime_start") -> pd.Series:
-    """True en las filas cuya fecha de publicación la comparten 24 periodos o más que
-    abarcan más de 365 días (ALFRED cargó de golpe la historia vieja ese día)."""
+    """True en las primeras versiones cuya fecha de publicación la comparten 24 periodos o más
+    que abarcan más de 365 días (ALFRED cargó de golpe la historia vieja ese día).
+
+    Solo cuenta la primera versión de cada periodo: una revisión general (p. ej. GDP en 2013
+    hasta 1929) también comparte fecha, pero es un dato publicado ese día, no estimable antes.
+    """
     if vintages.empty:
         return pd.Series(False, index=vintages.index, dtype=bool)
     per = pd.to_datetime(vintages[periodo])
-    grupos = per.groupby(vintages[publicacion])
+    pub = pd.to_datetime(vintages[publicacion])
+    primera = pub == pub.groupby(per).transform("min")
+    grupos = per[primera].groupby(pub[primera])
     cuantos = grupos.transform("nunique")
     abarca = grupos.transform("max") - grupos.transform("min")
-    marca = (cuantos >= MIN_PERIODOS_BLOQUE) & (abarca > pd.Timedelta(days=MIN_DIAS_BLOQUE))
-    return marca.astype(bool)
+    en_bloque = (cuantos >= MIN_PERIODOS_BLOQUE) & (abarca > pd.Timedelta(days=MIN_DIAS_BLOQUE))
+    return en_bloque.reindex(vintages.index, fill_value=False).astype(bool)
 
 
 def publicacion_cot(fecha_informe: date, informe: str, cot_conf: dict) -> tuple[datetime, bool]:
