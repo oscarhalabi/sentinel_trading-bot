@@ -95,8 +95,8 @@ Rama `fase2/datos-historicos`, PR oscarhalabi/sentinel_trading-bot#3.
   1.538 vacíos y 0 errores en el rango, tras 5 pasadas (los 503 sueltos salen al reintentar). El
   catálogo fijó `inicio=2003-05-05`. Antes de esa fecha la descarga anduvo 8 semanas vacías y se
   paró sola, como debe.
-- **Velas M1:** 283 meses en 84 s (344 MB). `velas` **no registra las M1 en el catálogo** (solo
-  `catalogo reconstruir` las ve): pendiente de corregir.
+- **Velas M1:** 283 meses en 84 s (344 MB). Al principio `velas` no anotaba las M1 en el
+  catálogo; corregido el 2026-11-18: ahora anota cada mes, también los que no cambian.
 - **Consulta:** un año H1 en 0,1 s; un año M1 (356 mil velas) en 0,07 s; 22 años H1 o D1 en ~1,4 s.
 - **`catalogo reconstruir`** en `sentinel_datos_test`: 9.149 particiones en 2 s; los conteos de
   ticks coinciden con el catálogo real (los 5 errores de antes de 2003 no tienen manifiesto).
@@ -106,7 +106,19 @@ Rama `fase2/datos-historicos`, PR oscarhalabi/sentinel_trading-bot#3.
   horario no sabe de festivos. En 2003 los domingos no traen datos. Pocos huecos reales posibles
   (2003-07-28, 2003-08-04, 2005-01-18). Los avisos de `salto` (36.505, de un tick y $0,2–1,8) y de
   `conteo` (983, todos antes de 2023, porque la mediana es la de los 23 años y los años viejos
-  tienen muchos menos ticks) son ruido de umbral. Pendiente: calendario de festivos y mediana móvil.
+  tienen muchos menos ticks) son ruido de umbral.
+- **Arreglos de `verificar` (Oscar, 2026-11-18: "sí, corrígelos"):**
+  - `datos/horarios.py` conoce los festivos de EE. UU. por reglas: la CME (metal, energía y
+    materias primas) cierra Viernes Santo, Navidad y Año Nuevo observados (sin cerrar el viernes
+    si el 1 de enero cae en sábado), y corta a las 13:00 NY en los festivos federales, el viernes
+    tras Acción de Gracias y Nochebuena. NYSE (`indice_us`, `accion_us`) cierra en los festivos
+    federales. No incluye cierres excepcionales.
+  - Un día vacío con menos de 3 horas abiertas (domingo) es aviso, no grave.
+  - `conteo` compara con la mediana de los días a ±45 días.
+  - Resultado en XAUUSD: **6 graves** (antes 125). Son el Columbus Day de 2013 y 2014 (la CME
+    cortaba antes ese día; no está en las reglas), 2012-06-13 de 0 a 3 UTC, y tres de 2003–2005.
+    Hay 53 avisos de conteo, todos domingos flojos. Los 36.505 avisos de `salto` siguen: el umbral
+    de 8 desviaciones es muy sensible para el oro (pendiente afinarlo).
 
 ## Pendientes
 
