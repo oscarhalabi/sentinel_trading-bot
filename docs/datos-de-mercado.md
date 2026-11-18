@@ -41,8 +41,8 @@ guardan claves en el repo.
 | `DATOS_PG_DSN_TEST` | Postgres para los tests | se omiten esos tests |
 | `DATOS_DISCO_MIN_GB` | La descarga para si queda menos espacio | 50 |
 | `DATOS_CORTE_RESERVA` | Fija el inicio de la reserva (AAAA-MM-DD) | hoy − 365 días |
-| `DUKAS_MAX_PARALELO` | Peticiones a la vez a Dukascopy | 4 (usar **3**) |
-| `DUKAS_MAX_POR_SEGUNDO` | Peticiones por segundo a Dukascopy | 20 (usar **3**) |
+| `DUKAS_MAX_PARALELO` | Peticiones a la vez a Dukascopy | 3 |
+| `DUKAS_MAX_POR_SEGUNDO` | Peticiones por segundo a Dukascopy | 3 |
 
 ## Cómo se baja
 

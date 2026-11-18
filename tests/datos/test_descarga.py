@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import time
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
@@ -400,3 +401,25 @@ def test_con_catalogo_ctrl_c_cierra_interrumpida(cfg):
         bajar(cfg, [_sim()], Rompe(), cat, desde=HASTA, hoy=HOY)
     assert cat.corridas[1][0] == "interrumpida"
     assert not (cfg.data_dir / "_registro" / "descarga.lock").exists()
+
+
+def test_candado_vacio_recien_creado_no_se_roba(cfg):
+    # Otro proceso lo acaba de crear y aún no escribió su PID.
+    carpeta = cfg.data_dir / "_registro"
+    carpeta.mkdir()
+    (carpeta / "descarga.lock").write_text("")
+    with pytest.raises(SystemExit, match="Ya hay una descarga"):
+        bajar(cfg, [_sim()], FuenteFalsa(), None, desde=HOY, hasta=HOY, hoy=HOY)
+    assert (carpeta / "descarga.lock").exists()
+
+
+def test_candado_vacio_viejo_se_reemplaza(cfg):
+    carpeta = cfg.data_dir / "_registro"
+    carpeta.mkdir()
+    ruta = carpeta / "descarga.lock"
+    ruta.write_text("")
+    viejo = time.time() - 3600
+    os.utime(ruta, (viejo, viejo))
+    f = FuenteFalsa()
+    bajar(cfg, [_sim()], f, None, desde=HASTA, hoy=HOY)
+    assert f.llamadas

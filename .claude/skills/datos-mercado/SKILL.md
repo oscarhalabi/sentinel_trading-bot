@@ -15,7 +15,7 @@ en el VPS de producción.
   los tests) como variables de usuario de Windows. Un proceso abierto antes de crearlas no las ve:
   en PowerShell, cargarlas con `[Environment]::GetEnvironmentVariable('DATA_DIR','User')`.
 - **Nunca** imprimir ni commitear el DSN ni las contraseñas (`pgpass.conf` vive en `%APPDATA%`).
-- Ritmo de Dukascopy: `DUKAS_MAX_PARALELO=3` y `DUKAS_MAX_POR_SEGUNDO=3`. Más rápido provoca 429/503.
+- Ritmo de Dukascopy: 3 en paralelo y 3 por segundo (es el valor por defecto; `DUKAS_MAX_PARALELO` y `DUKAS_MAX_POR_SEGUNDO` lo cambian). Más rápido provoca 429/503.
 
 ## 1. Bajar o relanzar una descarga
 

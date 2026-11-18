@@ -23,9 +23,9 @@ class Config:
     disco_min_gb: float
     corte_reserva: date | None
     # Ritmo de descarga de Dukascopy. Con 4 en paralelo y 20/s nos devolvió 429/503
-    # (2026-11-12); se puede bajar sin tocar código.
-    dukas_max_paralelo: int = 4
-    dukas_max_por_segundo: float = 20.0
+    # (2026-11-12); 3 y 3 bajó XAUUSD entero sin bloqueos (2026-11-14).
+    dukas_max_paralelo: int = 3
+    dukas_max_por_segundo: float = 3.0
 
 
 def _leer_entorno() -> dict[str, str]:
@@ -63,7 +63,7 @@ def cargar_config(entorno: Mapping[str, str] | None = None) -> Config:
             raise ConfigInvalida(
                 f"DATOS_CORTE_RESERVA debe ser AAAA-MM-DD, no {texto_corte!r}.") from None
 
-    texto_par = env.get("DUKAS_MAX_PARALELO", "").strip() or "4"
+    texto_par = env.get("DUKAS_MAX_PARALELO", "").strip() or "3"
     try:
         paralelo = int(texto_par)
     except ValueError:
@@ -71,7 +71,7 @@ def cargar_config(entorno: Mapping[str, str] | None = None) -> Config:
     if paralelo < 1:
         raise ConfigInvalida(f"DUKAS_MAX_PARALELO debe ser un entero de 1 o más, no {texto_par!r}.")
 
-    texto_ps = env.get("DUKAS_MAX_POR_SEGUNDO", "").strip() or "20"
+    texto_ps = env.get("DUKAS_MAX_POR_SEGUNDO", "").strip() or "3"
     try:
         por_segundo = float(texto_ps)
     except ValueError:

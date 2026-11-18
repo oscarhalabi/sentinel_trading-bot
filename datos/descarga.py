@@ -79,6 +79,13 @@ def _pid_del_candado(ruta: Path) -> int | None:
         return None
 
 
+def _recien_creado(ruta: Path, segundos: float = 10.0) -> bool:
+    try:
+        return time.time() - ruta.stat().st_mtime < segundos
+    except OSError:
+        return False
+
+
 @contextmanager
 def candado(raiz: Path):
     """Crea DATA_DIR/_registro/descarga.lock con el PID; lo borra al salir."""
@@ -90,6 +97,9 @@ def candado(raiz: Path):
             fd = os.open(str(ruta), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
         except FileExistsError:
             pid = _pid_del_candado(ruta)
+            if pid is None and _recien_creado(ruta):
+                # Otro proceso lo acaba de crear y aún no escribió su PID: no es huérfano.
+                raise SystemExit("Ya hay una descarga arrancando (candado recién creado).") from None
             if pid is not None and _pid_vivo(pid):
                 raise SystemExit(f"Ya hay una descarga en marcha (PID {pid})") from None
             try:  # candado huérfano: su dueño ya no existe

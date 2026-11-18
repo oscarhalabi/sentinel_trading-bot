@@ -204,8 +204,8 @@ class Dukascopy:
     sin_clase = 0  # instrumentos descartados en el último listado
     codigos_crudos: set[str] = set()  # todos los códigos del último listado, descartados o no
 
-    def __init__(self, http: ClienteHttp | None = None, max_paralelo: int = 4,
-                 max_por_segundo: float = 20.0, reintentos: int = 4, espera_base: float = 1.0,
+    def __init__(self, http: ClienteHttp | None = None, max_paralelo: int = 3,
+                 max_por_segundo: float = 3.0, reintentos: int = 4, espera_base: float = 1.0,
                  dormir: Callable[[float], None] = time.sleep) -> None:
         self._http = http if http is not None else ClienteRequests()
         self._max_paralelo = max_paralelo

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import argparse
 import sys
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 
 ORDENES = {
     "simbolos": "Lista los símbolos disponibles",
@@ -159,9 +159,19 @@ def _velas(args, config) -> int:
             print(f"No se pudo conectar al Postgres del catálogo ({type(e).__name__}). "
                   "No se arman velas.", file=sys.stderr)
             return 1
-    n = construir_m1(cfg, simbolos=args.simbolo or None, desde=args.desde, catalogo=cat)
+    try:
+        n = construir_m1(cfg, simbolos=args.simbolo or None, desde=args.desde, catalogo=cat)
+    finally:
+        if cat is not None:
+            cat.cerrar()
     print(f"Velas M1: {n} meses escritos.")
     return 0
+
+
+def _ultimo_dia_pedible() -> date:
+    """El último día que `bajar` pide por defecto (hoy UTC menos el margen)."""
+    from datos.descarga import DIAS_DE_MARGEN
+    return datetime.now(timezone.utc).date() - timedelta(days=DIAS_DE_MARGEN)
 
 
 def _faltantes(cat, simbolos) -> dict[str, int]:
@@ -174,7 +184,7 @@ def _faltantes(cat, simbolos) -> dict[str, int]:
         if tipo != "ticks" or sim not in nombres or not inicio:
             continue
         hechos = cat.estados(tipo, fuente, sim)
-        n = sum(1 for d in dias_pendientes(hechos, inicio, date.today()) if d not in hechos)
+        n = sum(1 for d in dias_pendientes(hechos, inicio, _ultimo_dia_pedible()) if d not in hechos)
         faltan[sim] = faltan.get(sim, 0) + n
     return faltan
 
@@ -250,7 +260,7 @@ def _catalogo(accion: str, config=None) -> int:
                 faltan = "n/d"
                 if tipo == "ticks" and inicio:
                     hechos = cat.estados(tipo, fuente, sim)
-                    faltan = sum(1 for d in dias_pendientes(hechos, inicio, date.today())
+                    faltan = sum(1 for d in dias_pendientes(hechos, inicio, _ultimo_dia_pedible())
                                  if d not in hechos)
                 print(f"{sim} [{fuente}/{tipo}]: ok={ok} vacio={vacio} error={error} "
                       f"faltantes={faltan} inicio={inicio or '-'}")

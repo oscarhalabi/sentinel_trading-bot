@@ -168,7 +168,7 @@ def conectar(cfg: Config | None = None,
     else:
         corte = f"TIMESTAMPTZ '{corte_reserva(cfg).isoformat()}'"
         filtros = {"ticks": f" WHERE ts < {corte}",
-                   "m1": f" WHERE ts < {corte} AND ts + INTERVAL 1 MINUTE <= {corte}"}
+                   "m1": f" WHERE ts + INTERVAL 1 MINUTE <= {corte}"}
     con = duckdb.connect()
     con.execute("SET TimeZone='UTC'")
     for tipo, esquema in (("ticks", ESQUEMA_TICKS), ("m1", ESQUEMA_M1)):

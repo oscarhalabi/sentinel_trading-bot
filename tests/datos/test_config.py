@@ -101,7 +101,7 @@ def test_cli_todas_las_ordenes_estan_conectadas():
 
 def test_ritmo_dukascopy(tmp_path):
     cfg = cargar_config({"DATA_DIR": str(tmp_path)})
-    assert (cfg.dukas_max_paralelo, cfg.dukas_max_por_segundo) == (4, 20.0)
+    assert (cfg.dukas_max_paralelo, cfg.dukas_max_por_segundo) == (3, 3.0)
     cfg = cargar_config({"DATA_DIR": str(tmp_path), "DUKAS_MAX_PARALELO": "1",
                          "DUKAS_MAX_POR_SEGUNDO": "0.5"})
     assert (cfg.dukas_max_paralelo, cfg.dukas_max_por_segundo) == (1, 0.5)
