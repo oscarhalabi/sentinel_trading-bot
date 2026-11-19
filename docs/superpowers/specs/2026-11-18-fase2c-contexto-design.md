@@ -95,8 +95,10 @@ inflacion, tipos, pib, consumo, actividad, vivienda, balanza, otros), `impacto` 
 - **Re-descargas de la API (solo se añade, nunca se reescribe):** cada descarga diaria que cambia
   algo de un evento (previsión, real, hora) añade una versión con `ts_version` = hora de descarga.
   Las filas idénticas no se duplican. Desde que empezamos a descargar, la previsión de la API también
-  queda guardada tal como estaba en cada momento (`prevision_es_pit = true`); en el histórico
-  bajado de golpe, `false`.
+  queda guardada tal como estaba en cada momento: `prevision_es_pit = true` solo si esa versión se
+  guardó **antes** del evento; en el histórico bajado de golpe, o en una descarga posterior al
+  evento, `false`. Para la sorpresa solo se usa la previsión de la última versión guardada antes del
+  evento (si no hay ninguna, la sorpresa queda vacía).
 - **Emparejar Forex Factory con la API** (para `prevision="mejor"` y el cruce de §9): mismo `evento`
   normalizado, misma `divisa` y `ts_evento` a ±90 min. Lo que no empareja se lista en el informe.
 - **Normalización de nombres:** un diccionario versionado (`datos/eventos.json`) mapea nombres de
