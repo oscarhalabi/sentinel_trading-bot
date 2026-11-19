@@ -1,0 +1,7 @@
+[
+ {"date":"2024-01-05 13:30:00","country":"US","event":"Non Farm Payrolls","currency":"USD","previous":216000,"estimate":170000,"actual":216000,"impact":"High","unit":"K"},
+ {"date":"2024-01-05 13:00:00","country":"DE","event":"Inflation Rate YoY","currency":"EUR","previous":"3.2%","estimate":"3.0%","actual":null,"impact":"Medium"},
+ {"date":"2024-01-05 15:00:00","country":"US","event":"Minor Survey","currency":"USD","previous":1,"estimate":1,"actual":null,"impact":"Low"},
+ {"date":"2024-01-05 12:00:00","country":"BR","event":"Retail Sales","currency":"BRL","previous":1,"estimate":1,"actual":null,"impact":"High"},
+ {"date":"2024-01-08","country":"CN","event":"CPI YoY","previous":-0.5,"estimate":-0.3,"actual":null,"impact":"Medium"}
+]
