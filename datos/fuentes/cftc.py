@@ -14,7 +14,8 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from datos.almacen import ESQUEMA_COT, escribir, escribir_crudo, ruta_relativa
+from datos.almacen import (ESQUEMA_COT, Manifiesto, escribir, escribir_crudo, momento_crudo,
+                           nombre_crudo, ruta_relativa)
 from datos.config import Config
 from datos.contexto_conf import cargar_contexto
 from datos.fuentes.base import ClienteHttp, ClienteRequests
@@ -31,6 +32,8 @@ URLS_COT = {
 }
 PRIMER_ANIO = {"legacy": 1986, "disaggregated": 2006, "tff": 2006}
 TIMEOUT = 120.0
+# Nombre del crudo: <informe>_<año>, con _primera si era la carga histórica.
+_RE_CRUDO = re.compile(r"^(?P<informe>legacy|disaggregated|tff)_\d{4}(?P<primera>_primera)?$")
 CLAVE = ["mercado", "informe", "fecha_informe", "campo"]
 
 # Columna del código de contrato y de la fecha, por informe (PROVISIONAL).
@@ -158,6 +161,37 @@ def _mezclar(raiz: Path, nuevas: pd.DataFrame, mercado: str, anio: int, ts_versi
     return agregadas.groupby("informe").size().to_dict()
 
 
+def _procesar(raiz: Path, cuerpo: bytes, informe: str, ts: datetime,
+              primera_vez: bool) -> dict[str, int]:
+    """Normaliza un zip de un informe y lo mezcla por mercado y año. Devuelve {informe: filas}."""
+    filas, desconocidos = _normalizar_filas(_texto_del_zip(cuerpo), informe,
+                                            cargar_contexto()["cot"], ts)
+    if desconocidos:
+        log.info("COT %s: %d filas con códigos desconocidos ignoradas", informe, desconocidos)
+    df = pa.Table.from_pylist(filas, schema=ESQUEMA_COT).to_pandas()
+    cuenta: dict[str, int] = {}
+    if df.empty:
+        return cuenta
+    df["_anio"] = [f.year for f in df["fecha_informe"]]
+    for (mercado, anio), grupo in df.groupby(["mercado", "_anio"]):
+        for inf, n in _mezclar(raiz, grupo.drop(columns="_anio"), mercado, int(anio),
+                               ts, primera_vez).items():
+            cuenta[inf] = cuenta.get(inf, 0) + n
+    return cuenta
+
+
+def procesar_crudo(cfg: Config, cuerpo: bytes, meta: Manifiesto) -> int:
+    """Normaliza un zip guardado (`<informe>_<año>`, con `_primera` si era carga histórica) y lo
+    mezcla. Es el mismo camino que usa la descarga en vivo; `reprocesar` lo usa sin red.
+    Devuelve las filas nuevas."""
+    m = _RE_CRUDO.match(nombre_crudo(meta))
+    if m is None:
+        raise ValueError(f"Crudo de la CFTC con nombre desconocido: {meta.ruta}")
+    cuenta = _procesar(Path(cfg.data_dir), cuerpo, m["informe"], momento_crudo(meta),
+                       bool(m["primera"]))
+    return sum(cuenta.values())
+
+
 def bajar_cot(cfg: Config, anios: list[int] | None = None, http: ClienteHttp | None = None,
               ahora: datetime | None = None, primera_vez: bool = False) -> dict[str, int]:
     """Baja los zips de la CFTC, guarda el crudo y mezcla. Devuelve {informe: filas_nuevas}.
@@ -165,36 +199,23 @@ def bajar_cot(cfg: Config, anios: list[int] | None = None, http: ClienteHttp | N
     Por defecto el año actual y el anterior. Si `anios` es None y aún no hay datos de la CFTC
     guardados, es la primera vez y se baja toda la historia (legacy desde 1986, disaggregated y
     tff desde 2006). `primera_vez=True` fuerza ese rango aunque ya haya datos. En una primera
-    vez, las claves nuevas llevan `ts_version` = `ts_conocido`; las correcciones, `ts_descarga`.
+    vez, las claves nuevas llevan `ts_version` = `ts_conocido`; las correcciones, `ts_descarga`
+    (el crudo lleva `_primera` en el nombre para poder reprocesarlo igual).
     """
     ahora = (ahora or datetime.now(timezone.utc)).astimezone(timezone.utc)
     http = http or ClienteRequests()
     raiz = Path(cfg.data_dir)
-    cot_conf = cargar_contexto()["cot"]
     if anios is None and not primera_vez:
         primera_vez = not any((raiz / "cot" / "fuente=cftc").glob("simbolo=*/*.parquet"))
     actual = ahora.year
     cuenta = {informe: 0 for informe in URLS_COT}
-    tablas, desconocidos = [], {}
     for informe, plantilla in URLS_COT.items():
         años = (anios if anios is not None
                 else range(PRIMER_ANIO[informe], actual + 1) if primera_vez
                 else [actual - 1, actual])
         for anio in años:
             cuerpo = _descargar(http, plantilla.format(anio=anio))
-            escribir_crudo(raiz, cuerpo, "cftc", f"{informe}_{anio}", ahora, "zip")
-            filas, desc = _normalizar_filas(_texto_del_zip(cuerpo), informe, cot_conf, ahora)
-            if desc:
-                desconocidos[informe] = desconocidos.get(informe, 0) + desc
-            tablas.append(pa.Table.from_pylist(filas, schema=ESQUEMA_COT))
-    for informe, n in desconocidos.items():
-        log.info("COT %s: %d filas con códigos desconocidos ignoradas", informe, n)
-    df = pa.concat_tables(tablas).to_pandas()
-    if df.empty:
-        return cuenta
-    df["_anio"] = [f.year for f in df["fecha_informe"]]
-    for (mercado, anio), grupo in df.groupby(["mercado", "_anio"]):
-        for informe, n in _mezclar(raiz, grupo.drop(columns="_anio"), mercado, int(anio),
-                                   ahora, primera_vez).items():
-            cuenta[informe] += n
+            nombre = f"{informe}_{anio}" + ("_primera" if primera_vez else "")
+            m = escribir_crudo(raiz, cuerpo, "cftc", nombre, ahora, "zip")
+            cuenta[informe] += procesar_crudo(cfg, cuerpo, m)
     return cuenta

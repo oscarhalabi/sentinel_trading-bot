@@ -9,7 +9,7 @@ from urllib.parse import urlencode
 import pandas as pd
 import pyarrow as pa
 
-from datos.almacen import ESQUEMA_SERIE, escribir, escribir_crudo
+from datos.almacen import ESQUEMA_SERIE, Manifiesto, escribir, escribir_crudo, nombre_crudo
 from datos.config import Config, ConfigInvalida
 from datos.contexto_conf import cargar_contexto
 from datos.fuentes.base import ClienteHttp, ClienteRequests
@@ -82,6 +82,27 @@ def _url(cfg: Config, serie_id: str, alfred: bool, con_clave: bool) -> str:
     return f"{URL_OBSERVACIONES}?{urlencode(params)}"
 
 
+def procesar_crudo(cfg: Config, cuerpo: bytes, meta: Manifiesto) -> int:
+    """Normaliza un crudo guardado (`alfred_<ID>` o `fred_<ID>`) y escribe la serie entera.
+
+    Es el mismo camino que usa la descarga en vivo; `reprocesar` lo usa sin red.
+    Devuelve las filas escritas.
+    """
+    fuente, _, sid = nombre_crudo(meta).partition("_")
+    if fuente not in ("alfred", "fred") or not sid:
+        raise ValueError(f"Crudo de FRED con nombre desconocido: {meta.ruta}")
+    alfred = fuente == "alfred"
+    ctx = cargar_contexto()
+    conf = next((s for s in ctx["series_alfred" if alfred else "series_fred"] if s["id"] == sid),
+                None)
+    if conf is None:
+        raise ValueError(f"La serie {sid} ya no está en contexto.json ({fuente})")
+    tabla = (normalizar_alfred if alfred else normalizar_fred)(cuerpo, conf)
+    escribir(Path(cfg.data_dir), tabla, "serie", fuente, sid, None,
+             origen={"url": _url(cfg, sid, alfred, False)})
+    return tabla.num_rows
+
+
 def bajar_series(cfg: Config, http: ClienteHttp | None = None,
                  ids: list[str] | None = None) -> dict[str, int]:
     """Baja y guarda las series de contexto.json. Devuelve las filas por serie.
@@ -106,12 +127,9 @@ def bajar_series(cfg: Config, http: ClienteHttp | None = None,
                 raise RuntimeError(f"HTTP {estado}")
             fuente = "alfred" if alfred else "fred"
             # El cuerpo de la respuesta no lleva la clave; la URL guardada tampoco.
-            escribir_crudo(Path(cfg.data_dir), cuerpo, fuente, f"{fuente}_{sid}",
-                           datetime.now(timezone.utc), "json")
-            tabla = (normalizar_alfred if alfred else normalizar_fred)(cuerpo, conf)
-            escribir(Path(cfg.data_dir), tabla, "serie", fuente, sid, None,
-                     origen={"url": _url(cfg, sid, alfred, False)})
-            filas[sid] = tabla.num_rows
+            m = escribir_crudo(Path(cfg.data_dir), cuerpo, fuente, f"{fuente}_{sid}",
+                               datetime.now(timezone.utc), "json")
+            filas[sid] = procesar_crudo(cfg, cuerpo, m)
         except Exception as e:  # noqa: BLE001 - seguimos con las demás series
             fallos.append(f"{sid} ({str(e).replace(cfg.fred_api_key, '***')})")
     if fallos:

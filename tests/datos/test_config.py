@@ -89,7 +89,7 @@ def test_cli_lista_ordenes():
 
 def test_cli_todas_las_ordenes_estan_conectadas():
     from datos.__main__ import ORDENES
-    assert len(ORDENES) == 5
+    assert len(ORDENES) == 6
     for orden in ORDENES:
         r = subprocess.run([sys.executable, "-m", "datos", orden, "--help"], cwd=RAIZ,
                            capture_output=True, text=True)

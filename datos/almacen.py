@@ -395,6 +395,49 @@ def listar_crudos(raiz: Path, fuente: str | None = None) -> Iterator[Manifiesto]
     yield from sorted(crudos, key=lambda m: m.ts_min or "")
 
 
+def nombre_crudo(m: Manifiesto) -> str:
+    """El `nombre` con el que se guardó un crudo (sin la hora delante ni la extensión)."""
+    archivo = PurePosixPath(m.ruta).name          # HHMMSS_<nombre>.<ext>.zst
+    return archivo.split("_", 1)[1].split(".", 1)[0]
+
+
+def momento_crudo(m: Manifiesto) -> datetime:
+    """El momento exacto (UTC) en que se bajó un crudo, tal como se pasó a `escribir_crudo`."""
+    return datetime.fromisoformat(m.ts_min).astimezone(timezone.utc)
+
+
+def _carpetas_fuente(raiz: Path, tipo: str, fuente: str) -> list[Path]:
+    """La carpeta de Parquet de un tipo y fuente, y la de sus manifiestos."""
+    _tipo_datos(tipo)
+    rel = PurePosixPath(tipo) / f"fuente={fuente}"
+    return [Path(raiz) / rel, Path(raiz) / CARPETA_MANIFIESTOS / rel]
+
+
+def mover_fuente(desde: Path, hacia: Path, tipo: str, fuente: str) -> bool:
+    """Mueve los Parquet y manifiestos de un tipo y fuente de la raíz `desde` a la raíz `hacia`
+    (misma estructura). Sirve para apartarlos antes de reprocesar y para devolverlos.
+    Devuelve True si había algo que mover."""
+    movido = False
+    for origen, destino in zip(_carpetas_fuente(desde, tipo, fuente),
+                               _carpetas_fuente(hacia, tipo, fuente)):
+        if origen.exists():
+            if destino.exists():
+                raise FileExistsError(f"Ya existe {destino}; no se mueve encima")
+            destino.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(origen), str(destino))
+            movido = True
+    return movido
+
+
+def borrar_fuente(raiz: Path, tipo: str, fuente: str) -> None:
+    """Borra los Parquet y manifiestos de un tipo y fuente (nunca los crudos)."""
+    if tipo == "crudo":
+        raise ValueError("Los crudos no se borran")
+    for carpeta in _carpetas_fuente(raiz, tipo, fuente):
+        if carpeta.exists():
+            shutil.rmtree(carpeta)
+
+
 def espacio_libre_gb(raiz: Path) -> float:
     """Espacio libre en GB del disco donde vive `raiz` (o su primer padre existente)."""
     p = Path(raiz)

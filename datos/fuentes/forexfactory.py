@@ -12,7 +12,8 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from datos.almacen import ESQUEMA_CALENDARIO, escribir, escribir_crudo, ruta_relativa
+from datos.almacen import (ESQUEMA_CALENDARIO, Manifiesto, escribir, escribir_crudo, momento_crudo,
+                           nombre_crudo, ruta_relativa)
 from datos.config import Config
 from datos.contexto_conf import cargar_contexto, cargar_eventos, normalizar_evento
 from datos.fuentes.base import ClienteHttp, ClienteRequests
@@ -124,6 +125,28 @@ def _mezclar(raiz: Path, nuevas: pd.DataFrame, divisa: str, anio: int,
     return agregadas
 
 
+def procesar_crudo(cfg: Config, cuerpo: bytes, meta: Manifiesto) -> int:
+    """Normaliza una foto guardada de FF y la mezcla en el calendario. Devuelve filas nuevas.
+
+    La hora de la foto es la del crudo. Es el mismo camino que usa la descarga en vivo;
+    `reprocesar` lo usa sin red.
+    """
+    if nombre_crudo(meta) not in _NOMBRES_CRUDO:
+        raise ValueError(f"Crudo de Forex Factory con nombre desconocido: {meta.ruta}")
+    ts_foto = momento_crudo(meta)
+    ctx = cargar_contexto()
+    df = normalizar_ff(cuerpo, ts_foto, cargar_eventos(), ctx["divisas_calendario"],
+                       ctx["impacto_min"]).to_pandas()
+    if df.empty:
+        return 0
+    df["_anio"] = df["ts_evento"].dt.year
+    nuevas = 0
+    for (divisa, anio), grupo in df.groupby(["divisa", "_anio"]):
+        nuevas += _mezclar(Path(cfg.data_dir), grupo.drop(columns="_anio"), divisa, int(anio),
+                           ts_foto)
+    return nuevas
+
+
 def guardar_foto(cfg: Config, http: ClienteHttp | None = None,
                  ahora: datetime | None = None) -> int:
     """Baja las dos semanas de FF, guarda el crudo y mezcla en el calendario. Devuelve filas nuevas.
@@ -133,25 +156,16 @@ def guardar_foto(cfg: Config, http: ClienteHttp | None = None,
     ahora = (ahora or datetime.now(timezone.utc)).astimezone(timezone.utc)
     http = http or ClienteRequests()
     raiz = Path(cfg.data_dir)
-    ctx = cargar_contexto()
-    mapa = cargar_eventos()
-    tablas, fallos = [], []
+    nuevas_filas, fallos = 0, []
     for url, nombre in zip(URLS_FF, _NOMBRES_CRUDO):
         try:
             estado, cuerpo = http.get(url, TIMEOUT)
             if estado != 200:
                 raise RuntimeError(f"HTTP {estado}")
-            escribir_crudo(raiz, cuerpo, "forexfactory", nombre, ahora, "json")
-            tablas.append(normalizar_ff(cuerpo, ahora, mapa, ctx["divisas_calendario"],
-                                        ctx["impacto_min"]))
+            m = escribir_crudo(raiz, cuerpo, "forexfactory", nombre, ahora, "json")
+            nuevas_filas += procesar_crudo(cfg, cuerpo, m)
         except Exception as e:  # noqa: BLE001 - seguimos con la otra URL
             fallos.append(f"{url} ({e})")
-    nuevas_filas = 0
-    if tablas:
-        df = pa.concat_tables(tablas).to_pandas()
-        df["_anio"] = df["ts_evento"].dt.year
-        for (divisa, anio), grupo in df.groupby(["divisa", "_anio"]):
-            nuevas_filas += _mezclar(raiz, grupo.drop(columns="_anio"), divisa, int(anio), ahora)
     if fallos:
         raise RuntimeError("Falló la descarga de Forex Factory: " + "; ".join(fallos))
     return nuevas_filas

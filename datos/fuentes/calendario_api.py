@@ -21,8 +21,8 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from datos.almacen import (ESQUEMA_CALENDARIO, ESQUEMA_CORPORATIVO, escribir, escribir_crudo,
-                           ruta_relativa)
+from datos.almacen import (ESQUEMA_CALENDARIO, ESQUEMA_CORPORATIVO, Manifiesto, escribir,
+                           escribir_crudo, momento_crudo, nombre_crudo, ruta_relativa)
 from datos.config import Config, ConfigInvalida
 from datos.contexto_conf import cargar_contexto, cargar_eventos, normalizar_evento
 from datos.fuentes.base import ClienteHttp, ClienteRequests
@@ -333,9 +333,65 @@ def _mezclar(raiz: Path, nuevas: pd.DataFrame, fuente: str, divisa: str, anio: i
     return agregadas
 
 
+def nombre_crudo_calendario(fuente: str, mes: str, pagina: int, historico: bool) -> str:
+    """`fmp_cal_2024-01`, `eodhd_cal_2024-01_p0`; con `_hist` al final si es carga histórica
+    (así `reprocesar` sabe cómo se normalizó)."""
+    return (f"{fuente}_cal_{mes}" + (f"_p{pagina}" if fuente == "eodhd" else "")
+            + ("_hist" if historico else ""))
+
+
+_RE_CAL = re.compile(r"^(?P<fuente>[a-z]+)_cal_\d{4}-\d{2}(?:_p\d+)?(?P<hist>_hist)?$")
+_RE_CORP = re.compile(r"^(?P<fuente>[a-z]+)_(?P<tipo>split|div)_(?P<ticker>[A-Za-z0-9_-]+)$")
+
+
+def _procesar_calendario(raiz: Path, src: _Base, cuerpo: bytes, ts: datetime,
+                         historico: bool) -> int:
+    df = src.normalizar_eventos(cuerpo, ts, historico).to_pandas()
+    if df.empty:
+        return 0
+    df["_anio"] = df["ts_evento"].dt.year
+    nuevas = 0
+    for (divisa, anio), grupo in df.groupby(["divisa", "_anio"]):
+        nuevas += _mezclar(raiz, grupo.drop(columns="_anio"), src.nombre, divisa, int(anio),
+                           ts, historico)
+    return nuevas
+
+
+def _procesar_corporativo(raiz: Path, src: _Base, cuerpo: bytes, tipo: str,
+                          simbolo: str) -> int:
+    """Un crudo de splits o de dividendos. Se mezclan por separado: la clave lleva el tipo."""
+    cuerpos = [cuerpo, b"[]"] if tipo == "split" else [b"[]", cuerpo]
+    return _mezclar_corporativo(raiz, src.normalizar_corporativos(cuerpos, simbolo),
+                                src.nombre, simbolo)
+
+
+def _ticker_seguro(ticker: str) -> str:
+    return re.sub(r"[^A-Za-z0-9_-]", "-", ticker)
+
+
+def procesar_crudo(cfg: Config, cuerpo: bytes, meta: Manifiesto) -> int:
+    """Normaliza un crudo guardado de FMP o EODHD (calendario, splits o dividendos) y lo mezcla.
+
+    Todo sale del crudo: la fuente, si fue histórico (`_hist`), el ticker y la hora de descarga.
+    Es el mismo camino que usa la descarga en vivo; `reprocesar` lo usa sin red. No pide clave.
+    """
+    nombre = nombre_crudo(meta)
+    raiz = Path(cfg.data_dir)
+    cal, corp = _RE_CAL.match(nombre), _RE_CORP.match(nombre)
+    m = cal or corp
+    if m is None or m["fuente"] != meta.fuente or meta.fuente not in FUENTES_CALENDARIO:
+        raise ValueError(f"Crudo de {meta.fuente} con nombre desconocido: {meta.ruta}")
+    src = FUENTES_CALENDARIO[meta.fuente](cfg)
+    if cal:
+        return _procesar_calendario(raiz, src, cuerpo, momento_crudo(meta), bool(cal["hist"]))
+    # El ticker guardado es el de EE. UU. sin `.US` (un "." se guardó como "-").
+    simbolo = corp["ticker"].replace("-", ".") + ".US"
+    return _procesar_corporativo(raiz, src, cuerpo, corp["tipo"], simbolo)
+
+
 def bajar_calendario(cfg: Config, fuente: str, desde: date, hasta: date, historico: bool,
                      http: ClienteHttp | None = None) -> int:
-    """Baja el calendario por meses, guarda el crudo de cada página y mezcla (solo añadir).
+    """Baja el calendario por meses, guarda el crudo de cada página y lo mezcla (solo añadir).
 
     Devuelve las filas nuevas. Sin clave de la fuente falla antes de pedir nada.
     """
@@ -344,20 +400,10 @@ def bajar_calendario(cfg: Config, fuente: str, desde: date, hasta: date, histori
     ts = datetime.now(timezone.utc)
     nuevas = 0
     for ini, fin in _meses(desde, hasta):
-        mes = f"{ini:%Y-%m}"
-        paginas = src.paginas_eventos(ini, fin)
-        tablas = []
-        for i, cuerpo in enumerate(paginas):
-            nombre = f"{fuente}_cal_{mes}" + (f"_p{i}" if fuente == "eodhd" else "")
-            escribir_crudo(raiz, cuerpo, fuente, nombre, ts, "json")
-            tablas.append(src.normalizar_eventos(cuerpo, ts, historico))
-        df = pa.concat_tables(tablas).to_pandas()
-        if df.empty:
-            continue
-        df["_anio"] = df["ts_evento"].dt.year
-        for (divisa, anio), grupo in df.groupby(["divisa", "_anio"]):
-            nuevas += _mezclar(raiz, grupo.drop(columns="_anio"), fuente, divisa, int(anio),
-                               ts, historico)
+        for i, cuerpo in enumerate(src.paginas_eventos(ini, fin)):
+            nombre = nombre_crudo_calendario(fuente, f"{ini:%Y-%m}", i, historico)
+            m = escribir_crudo(raiz, cuerpo, fuente, nombre, ts, "json")
+            nuevas += procesar_crudo(cfg, cuerpo, m)
     return nuevas
 
 
@@ -406,14 +452,12 @@ def bajar_corporativos(cfg: Config, fuente: str, simbolos: list[Simbolo],
         ticker = s.simbolo[:-3]
         try:
             cuerpos = src.bajar_corporativos(ticker)
-            seguro = re.sub(r"[^A-Za-z0-9_-]", "-", ticker)
             for tipo, cuerpo in zip(("split", "div"), cuerpos):
-                escribir_crudo(raiz, cuerpo, fuente, f"{fuente}_{tipo}_{seguro}", ts, "json")
-            tabla = src.normalizar_corporativos(cuerpos, s.simbolo)
+                m = escribir_crudo(raiz, cuerpo, fuente,
+                                   f"{fuente}_{tipo}_{_ticker_seguro(ticker)}", ts, "json")
+                filas += procesar_crudo(cfg, cuerpo, m)
         except Exception as e:  # noqa: BLE001 - seguimos con el resto
             fallos.append(f"{s.simbolo} ({e})")
-            continue
-        filas += _mezclar_corporativo(raiz, tabla, fuente, s.simbolo)
     if omitidos:
         log.warning("%d símbolos no EE. UU. omitidos en corporativos (limitación de la Task 6)",
                     omitidos)

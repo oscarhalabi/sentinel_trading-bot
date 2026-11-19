@@ -11,6 +11,7 @@ ORDENES = {
     "velas": "Construye velas a partir de ticks",
     "verificar": "Verifica la integridad de lo guardado",
     "catalogo": "Muestra o reconstruye el catálogo",
+    "contexto": "Datos de contexto: calendario, macro, COT, GLD y corporativos",
 }
 
 
@@ -48,7 +49,34 @@ def construir_parser() -> argparse.ArgumentParser:
             csub.add_parser("migrar", help="Crea o actualiza las tablas del catálogo")
             csub.add_parser("reconstruir", help="Rehace el catálogo desde los manifiestos")
             csub.add_parser("estado", help="Resume lo que hay por símbolo")
+        if nombre == "contexto":
+            _parser_contexto(sp)
     return p
+
+
+def _parser_contexto(sp) -> None:
+    from datos.contexto_bajar import ALIAS_CRUDO, FUENTES_BAJAR, FUENTES_CRUDO
+
+    csub = sp.add_subparsers(dest="accion", metavar="accion")
+    b = csub.add_parser("bajar", help="Baja las fuentes de contexto (sin nombrarlas: todas)")
+    b.add_argument("fuentes", nargs="*", choices=FUENTES_BAJAR, metavar="fuente",
+                   help=f"Solo estas: {', '.join(FUENTES_BAJAR)}")
+    b.add_argument("--desde", type=date.fromisoformat,
+                   help="Primer día (AAAA-MM-DD) para calendario; en cot, años desde ese")
+    b.add_argument("--historico", action="store_true",
+                   help="Carga histórica del calendario (exige --desde; solo calendario)")
+    r = csub.add_parser("reprocesar",
+                        help="Rehace los Parquet de contexto desde los crudos, sin red")
+    r.add_argument("--fuente", choices=FUENTES_CRUDO + tuple(ALIAS_CRUDO),
+                   help="Solo esta fuente de crudos (sin esto: todas)")
+    pc = csub.add_parser("probar-calendario",
+                         help="Compara APIs de calendario y escribe un informe HTML")
+    pc.add_argument("--fuentes", default="fmp,eodhd",
+                    help="Separadas por comas: fmp, eodhd, te (por defecto fmp,eodhd)")
+    pc.add_argument("--desde", type=date.fromisoformat, default=date(2008, 1, 1))
+    pc.add_argument("--hasta", type=date.fromisoformat, default=date(2008, 1, 31))
+    pc.add_argument("--desde2", type=date.fromisoformat, default=date(2024, 1, 1))
+    pc.add_argument("--hasta2", type=date.fromisoformat, default=date(2024, 1, 31))
 
 
 def _descubrir(aplicar: bool, fuente, ruta) -> int:
@@ -267,7 +295,101 @@ def _catalogo(accion: str, config=None) -> int:
     return 0
 
 
-def main(argv: list[str] | None = None, fuente=None, ruta=None, config=None) -> int:
+def _contexto_bajar(args, ruta, cfg, http) -> int:
+    from datos import catalogo
+    from datos import simbolos as sim
+    from datos.contexto_bajar import FUENTES_BAJAR, bajar_contexto, imprimir
+
+    if args.historico and not args.desde:
+        print("--historico necesita --desde (AAAA-MM-DD).", file=sys.stderr)
+        return 2
+    fuentes = list(dict.fromkeys(args.fuentes))
+    if args.historico:
+        if fuentes and fuentes != ["calendario"]:
+            print("--historico solo vale para calendario.", file=sys.stderr)
+            return 2
+        fuentes = ["calendario"]
+    fuentes = fuentes or list(FUENTES_BAJAR)
+    simbolos = []
+    if "corporativo" in fuentes:
+        registro = sim.cargar(ruta if ruta is not None else sim.RUTA_REGISTRO)
+        simbolos = [s for s in registro.values() if s.activo and s.clase in ("accion", "etf")]
+    cat = corrida = None
+    if cfg.pg_dsn:
+        try:
+            cat = catalogo.Catalogo(cfg.pg_dsn)
+            corrida = cat.abrir_corrida("contexto bajar")
+        except Exception as e:  # el mensaje de psycopg2 puede traer el DSN: no se imprime
+            print(f"No se pudo conectar al Postgres del catálogo ({type(e).__name__}). "
+                  "No se descarga nada.", file=sys.stderr)
+            if cat is not None:
+                cat.cerrar()
+            return 1
+    resultado = "interrumpida"
+    try:
+        res = bajar_contexto(cfg, fuentes, simbolos, desde=args.desde, historico=args.historico,
+                             http=http, catalogo=cat)
+        resultado = "error" if res.fallos else "ok"
+    finally:
+        if cat is not None:
+            resumen = {"fuentes": fuentes}
+            if resultado != "interrumpida":
+                resumen.update(filas=res.filas, fallos=res.fallos)
+            cat.cerrar_corrida(corrida, resultado, resumen)
+            cat.cerrar()
+    imprimir(res, fuentes)
+    return 1 if res.fallos else 0
+
+
+def _contexto_reprocesar(args, cfg) -> int:
+    from datos.contexto_bajar import ALIAS_CRUDO, reprocesar
+
+    fuente = ALIAS_CRUDO.get(args.fuente, args.fuente)
+    res = reprocesar(cfg, [fuente] if fuente else None)
+    print(f"Reprocesados {res.crudos} crudos ({res.filas} filas).")
+    for f in res.fallidos:
+        print(f"  No se pudo procesar: {f}")
+    if cfg.pg_dsn:
+        print("Si usas el catálogo, ponlo al día con: python -m datos catalogo reconstruir")
+    return 1 if res.fallidos else 0
+
+
+def _contexto_probar(args, cfg, http) -> int:
+    from datos.prueba_calendario import FUENTES_PRUEBA, probar_calendario
+
+    fuentes = [f.strip().lower() for f in args.fuentes.split(",") if f.strip()]
+    malas = [f for f in fuentes if f not in FUENTES_PRUEBA]
+    if malas or not fuentes:
+        print(f"Fuente de calendario desconocida: {', '.join(malas) or '(ninguna)'}. "
+              f"Disponibles: {', '.join(FUENTES_PRUEBA)}.", file=sys.stderr)
+        return 2
+    rangos = [(args.desde, args.hasta), (args.desde2, args.hasta2)]
+    if any(d > h for d, h in rangos):
+        print("Cada --desde debe ser anterior o igual a su --hasta.", file=sys.stderr)
+        return 2
+    ruta, resultados = probar_calendario(cfg, list(dict.fromkeys(fuentes)), rangos, http=http)
+    for r in resultados.values():
+        detalle = f" ({len(r.errores)} errores)" if r.errores else ""
+        print(f"{r.fuente}: {r.estado}{detalle}")
+    print(f"Informe: {ruta}")
+    return 0
+
+
+def _contexto(args, ruta, config, http) -> int:
+    from datos.config import cargar_config
+
+    if getattr(args, "accion", None) is None:
+        print("Falta la acción: bajar, reprocesar o probar-calendario.", file=sys.stderr)
+        return 2
+    cfg = config if config is not None else cargar_config()
+    if args.accion == "bajar":
+        return _contexto_bajar(args, ruta, cfg, http)
+    if args.accion == "reprocesar":
+        return _contexto_reprocesar(args, cfg)
+    return _contexto_probar(args, cfg, http)
+
+
+def main(argv: list[str] | None = None, fuente=None, ruta=None, config=None, http=None) -> int:
     p = construir_parser()
     args = p.parse_args(argv)
     if args.orden is None:
@@ -286,6 +408,8 @@ def main(argv: list[str] | None = None, fuente=None, ruta=None, config=None) -> 
             print("Falta la acción: migrar, reconstruir o estado.", file=sys.stderr)
             return 2
         return _catalogo(args.accion, config)
+    if args.orden == "contexto":
+        return _contexto(args, ruta, config, http)
     print("Falta indicar la acción de la orden (usa --help).", file=sys.stderr)
     return 2
 

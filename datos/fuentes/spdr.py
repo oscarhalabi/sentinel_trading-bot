@@ -14,7 +14,8 @@ from pathlib import Path
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from datos.almacen import ESQUEMA_ETF, escribir, escribir_crudo, ruta_relativa
+from datos.almacen import (ESQUEMA_ETF, Manifiesto, escribir, escribir_crudo, nombre_crudo,
+                           ruta_relativa)
 from datos.config import Config
 from datos.contexto_conf import cargar_contexto
 from datos.fuentes.base import ClienteHttp, ClienteRequests
@@ -96,6 +97,14 @@ def _mezclar(raiz: Path, nueva: pa.Table) -> int:
     return len(nuevas)
 
 
+def procesar_crudo(cfg: Config, cuerpo: bytes, meta: Manifiesto) -> int:
+    """Normaliza un CSV guardado (`spdr_gld`) y lo mezcla. Es el mismo camino que usa la
+    descarga en vivo; `reprocesar` lo usa sin red. Devuelve las filas nuevas."""
+    if nombre_crudo(meta) != "spdr_gld":
+        raise ValueError(f"Crudo de SPDR con nombre desconocido: {meta.ruta}")
+    return _mezclar(Path(cfg.data_dir), normalizar_gld(cuerpo, cargar_contexto()["etf"]["GLD"]))
+
+
 def bajar_gld(cfg: Config, http: ClienteHttp | None = None) -> int:
     """Baja el CSV, guarda el crudo y mezcla (solo añadir). Devuelve las filas nuevas."""
     http = http or ClienteRequests()
@@ -105,7 +114,6 @@ def bajar_gld(cfg: Config, http: ClienteHttp | None = None) -> int:
         raise RuntimeError(f"spdr: error de red al bajar GLD: {type(e).__name__}") from None
     if estado != 200:
         raise RuntimeError(f"spdr: HTTP {estado} al bajar GLD")
-    raiz = Path(cfg.data_dir)
-    ts = datetime.now(timezone.utc)
-    escribir_crudo(raiz, cuerpo, "spdr", "spdr_gld", ts, "csv")
-    return _mezclar(raiz, normalizar_gld(cuerpo, cargar_contexto()["etf"]["GLD"]))
+    m = escribir_crudo(Path(cfg.data_dir), cuerpo, "spdr", "spdr_gld", datetime.now(timezone.utc),
+                       "csv")
+    return procesar_crudo(cfg, cuerpo, m)
