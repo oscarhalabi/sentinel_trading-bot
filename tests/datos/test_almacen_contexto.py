@@ -80,7 +80,7 @@ def test_crudo_ida_y_vuelta(tmp_path):
     cuerpo = b'{"mensaje": "texto_plano_reconocible", "n": [1, 2, 3]}' * 50
     momento = datetime(2024, 3, 5, 13, 30, 15, tzinfo=timezone.utc)
     m = escribir_crudo(tmp_path, cuerpo, "fmp", "calendario_usd", momento, "json")
-    assert m.ruta == "crudo/fuente=fmp/2024/03/05/133015_calendario_usd.json.zst"
+    assert m.ruta == "crudo/fuente=fmp/2024/03/05/133015000000_calendario_usd.json.zst"
     assert m.tipo == "crudo" and m.periodo == "2024-03-05" and m.filas == 0
     assert m.ts_min == m.ts_max == "2024-03-05T13:30:15+00:00"
     assert leer_crudo(tmp_path, m.ruta) == cuerpo
@@ -91,6 +91,21 @@ def test_crudo_ida_y_vuelta(tmp_path):
     escribir_crudo(tmp_path, b"{}", "otra", "x", momento, "json")
     assert [x.ruta for x in listar_crudos(tmp_path, "fmp")] == [m.ruta]
     assert len(list(listar_crudos(tmp_path))) == 2
+
+
+def test_crudo_mismo_segundo_no_se_pisa(tmp_path):
+    from datos.almacen import nombre_crudo, momento_crudo
+    t1 = datetime(2024, 3, 5, 13, 30, 15, 123456, tzinfo=timezone.utc)
+    t2 = t1.replace(microsecond=654321)
+    m1 = escribir_crudo(tmp_path, b"uno", "fmp", "cal", t1, "json")
+    m2 = escribir_crudo(tmp_path, b"dos", "fmp", "cal", t2, "json")
+    assert m1.ruta.endswith("/133015123456_cal.json.zst") and m1.ruta != m2.ruta
+    assert leer_crudo(tmp_path, m1.ruta) == b"uno" and leer_crudo(tmp_path, m2.ruta) == b"dos"
+    assert nombre_crudo(m1) == "cal" and momento_crudo(m2) == t2
+    # Mismo nombre y mismo instante exacto: error claro, sin reemplazar el guardado.
+    with pytest.raises(FileExistsError, match="ya existe"):
+        escribir_crudo(tmp_path, b"tres", "fmp", "cal", t1, "json")
+    assert leer_crudo(tmp_path, m1.ruta) == b"uno"
 
 
 def test_crudo_nombre_invalido(tmp_path):

@@ -360,13 +360,20 @@ _NOMBRE_CRUDO = re.compile(r"[A-Za-z0-9_-]+")
 
 def escribir_crudo(raiz: Path, contenido: bytes, fuente: str, nombre: str,
                    momento: datetime, extension: str) -> Manifiesto:
-    """Guarda una respuesta descargada tal cual, comprimida con zstd, y su manifiesto."""
+    """Guarda una respuesta descargada tal cual, comprimida con zstd, y su manifiesto.
+
+    El archivo se llama `HHMMSSffffff_<nombre>` (con microsegundos): dos descargas en el mismo
+    segundo no se pisan. Si aun así ya existe, FileExistsError (nunca se reemplaza un crudo).
+    """
     if not _NOMBRE_CRUDO.fullmatch(nombre):
         raise ValueError(f"Nombre de crudo no válido (solo letras, números, _ y -): {nombre!r}")
     raiz = Path(raiz)
     momento = momento.astimezone(timezone.utc)
     rel = (PurePosixPath("crudo") / f"fuente={fuente}" / f"{momento:%Y}" / f"{momento:%m}"
-           / f"{momento:%d}" / f"{momento:%H%M%S}_{nombre}.{extension}.zst")
+           / f"{momento:%d}" / f"{momento:%H%M%S%f}_{nombre}.{extension}.zst")
+    if (raiz / rel).exists():
+        raise FileExistsError(f"El crudo {rel} ya existe; no se reemplaza (mismo nombre y "
+                              f"mismo instante)")
     salida = pa.BufferOutputStream()
     with pa.CompressedOutputStream(salida, "zstd") as z:
         z.write(contenido)
@@ -397,7 +404,7 @@ def listar_crudos(raiz: Path, fuente: str | None = None) -> Iterator[Manifiesto]
 
 def nombre_crudo(m: Manifiesto) -> str:
     """El `nombre` con el que se guardó un crudo (sin la hora delante ni la extensión)."""
-    archivo = PurePosixPath(m.ruta).name          # HHMMSS_<nombre>.<ext>.zst
+    archivo = PurePosixPath(m.ruta).name   # HHMMSSffffff_<nombre>.<ext>.zst (o HHMMSS_ viejo)
     return archivo.split("_", 1)[1].split(".", 1)[0]
 
 

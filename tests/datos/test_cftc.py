@@ -107,12 +107,12 @@ def leer(cfg, mercado, anio):
 def test_bajar_cot_por_defecto_dos_anios(cfg):
     bajar_cot(cfg, anios=[2026], http=http_con(), ahora=T0)   # ya hay datos: no es primera vez
     h = http_con()
-    res = bajar_cot(cfg, http=h, ahora=T0)
+    res = bajar_cot(cfg, http=h, ahora=T0.replace(minute=1))
     assert res == {"legacy": 5, "disaggregated": 3, "tff": 3}   # solo lo de 2025
     assert len(h.pedidas) == 6
     assert {f["informe"] for f in leer(cfg, "ORO", 2026)} == {"legacy", "disaggregated"}
     assert leer(cfg, "ORO", 2025)
-    assert bajar_cot(cfg, http=http_con(), ahora=T0) == {"legacy": 0, "disaggregated": 0, "tff": 0}
+    assert bajar_cot(cfg, http=http_con(), ahora=T0.replace(minute=2)) == {"legacy": 0, "disaggregated": 0, "tff": 0}
 
 
 def test_cot_correccion_crea_version(cfg):
@@ -235,7 +235,7 @@ def test_carga_cortada_y_relanzada_historial_visible(cfg):
     h = Cortada(_http_2006().cuerpos)
     with pytest.raises(RuntimeError):
         bajar_cot(cfg, anios=list(range(2006, 2012)), http=h, ahora=T0)
-    bajar_cot(cfg, anios=list(range(2006, 2012)), http=_http_2006(), ahora=T0)
+    bajar_cot(cfg, anios=list(range(2006, 2012)), http=_http_2006(), ahora=T0.replace(minute=1))
     r = _visible_2006(cfg)
     assert len(r) == 5 and (r["ts_version"] == r["ts_conocido"]).all()
 
