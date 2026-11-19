@@ -487,9 +487,37 @@ def _prevision_ff(eventos: pd.DataFrame, fotos: pd.DataFrame,
     return vacia.combine_first(ultima.set_index("_fila")["_prev_ff"]).reindex(eventos.index)
 
 
+def _prevision_previa(filas: pd.DataFrame, versiones: pd.DataFrame) -> pd.Series:
+    """Previsión "propia" de cada fila: la de la última versión de su evento (`_clave`) guardada
+    ANTES del evento (`ts_version < ts_evento`) y no después de la propia fila. Una previsión
+    bajada después del dato puede ser posterior a él: nunca vale. NaN si no hay versión previa."""
+    vacia = pd.Series(np.nan, index=filas.index, dtype="float64")
+    if filas.empty or versiones.empty:
+        return vacia
+    un_us = pd.Timedelta(microseconds=1)
+    limite = filas["ts_version"].where(filas["ts_version"] < filas["ts_evento"],
+                                       filas["ts_evento"] - un_us)
+    izq = (pd.DataFrame({"_fila": filas.index, "_clave": filas["_clave"].to_numpy(),
+                         "_lim": limite.to_numpy()})
+           .dropna(subset=["_lim"]))
+    der = (versiones[["_clave", "ts_version", "prevision"]]
+           .rename(columns={"ts_version": "_tv", "prevision": "_p"})
+           .dropna(subset=["_tv"]))
+    if izq.empty or der.empty:
+        return vacia
+    izq["_lim"] = izq["_lim"].astype("datetime64[ns, UTC]")
+    der = der.assign(_tv=der["_tv"].astype("datetime64[ns, UTC]"),
+                     _p=der["_p"].astype("float64"))
+    m = pd.merge_asof(izq.sort_values("_lim", kind="stable"),
+                      der.sort_values("_tv", kind="stable"),
+                      left_on="_lim", right_on="_tv", by="_clave", direction="backward")
+    return vacia.combine_first(m.set_index("_fila")["_p"]).reindex(filas.index)
+
+
 def _elegir_prevision(eventos: pd.DataFrame, fotos: pd.DataFrame, modo: str,
                       t: pd.Timestamp | None) -> tuple[pd.Series, pd.Series]:
-    """(prevision, fuente_prevision) según el modo 'ff', 'api' o 'mejor'."""
+    """(prevision, fuente_prevision) según el modo 'ff', 'api' o 'mejor'. La columna
+    `prevision` de `eventos` ya debe ser la previa al evento (`_prevision_previa`)."""
     propia = eventos["prevision"].astype("float64")
     etiqueta_propia = pd.Series(np.where(eventos["fuente"] == _FUENTE_FF, "ff", "api"),
                                 index=eventos.index, dtype=object)
@@ -549,6 +577,7 @@ def _contexto_calendario(cfg: Config, d: datetime, h: datetime, t: pd.Timestamp,
 
     reusar = df if fuente in (None, _FUENTE_FF) else None
     fotos = df.iloc[0:0] if prevision == "api" else _leer_fotos_ff(cfg, claves, anios, reusar)
+    ev["prevision"] = _prevision_previa(ev, guardadas)
     ev["prevision"], ev["fuente_prevision"] = _elegir_prevision(ev, fotos, prevision, t)
     ev["sorpresa"] = ev["real"] - ev["prevision"]
     ev["revision_anterior"] = ev["anterior_revisado"] - ev["anterior"]
@@ -589,8 +618,9 @@ def contexto(tipo: str, desde: Fecha, hasta: Fecha, conocido_en: Fecha | None = 
       sale si `ts_anunciado ≤ conocido_en`; `real`, `sorpresa`, `anterior_revisado` y
       `revision_anterior` van vacíos hasta que se conoce el dato. `prevision` elige la
       previsión ('ff': última foto de Forex Factory anterior al evento, a ±90 min; 'api':
-      la de la propia fila; 'mejor': FF si hay, si no la de la API) y `fuente_prevision`
-      dice cuál se usó. `horizonte_dias` recalcula el anuncio de las filas históricas.
+      la de la última versión de la propia fuente guardada antes del evento; 'mejor': FF si
+      hay, si no la de la API) y `fuente_prevision` dice cuál se usó. Una previsión bajada
+      después del evento nunca se usa: sin versión previa al evento, previsión y sorpresa NaN. `horizonte_dias` recalcula el anuncio de las filas históricas.
     - serie: la versión vigente en ese instante; `excluir_estimadas` quita las publicaciones
       estimadas de las cargas en bloque de ALFRED.
     - Reserva: sin `incluir_reservado` nada conocido después del corte se ve; si todo el
@@ -743,6 +773,8 @@ def _unir_calendario(base, cfg, fuentes, lat, prevision, impacto_min, divisas, l
     df = df[df["ts_version"].notna()]
     df = df.assign(_clave=_clave_evento(df)).sort_values(["_clave", "ts_version"], kind="stable")
     df = df.drop_duplicates(["_clave", "ts_version"], keep="last")
+    # La previsión de cada versión: la última de su evento anterior al evento (con todas).
+    df = df.assign(prevision=_prevision_previa(df, df))
     # Cada versión vale desde que se guardó hasta que llega la siguiente de su evento. Se
     # calcula con TODAS las versiones, antes de filtrar: si la última versión baja de impacto
     # o pierde la hora exacta, la anterior deja de valer igualmente.

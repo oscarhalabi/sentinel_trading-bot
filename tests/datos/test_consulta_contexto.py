@@ -542,3 +542,87 @@ def test_unir_contexto_claves_sin_datos_dan_columnas_nan(tmp_path):
     from datos.contexto_conf import cargar_contexto
     for campo in cargar_contexto()["cot"]["campos"]:
         assert r[f"cot_ORO_{campo}"].isna().all()
+
+
+# --- C1: la previsión de la sorpresa nunca es posterior al evento -----------
+
+
+def _nfp_api(estimado, real):
+    return json.dumps([{"id": "1", "date": "2025-03-07 13:30:00", "country": "US",
+                        "currency": "USD", "event": "Nonfarm Payrolls", "estimate": estimado,
+                        "actual": real, "previous": 100, "impact": "High"}]).encode()
+
+
+def _guardar_api(cfg, cuerpo, ts):
+    from datos.almacen import escribir_crudo
+    from datos.fuentes import calendario_api
+    m = escribir_crudo(cfg.data_dir, cuerpo, "fmp", "fmp_cal_2025-03", ts, "json")
+    calendario_api.procesar_crudo(cfg, cuerpo, m)
+
+
+def _nfp_cambia_tras_el_evento(tmp_path):
+    """Previsión 200 bajada antes del NFP; descarga posterior con previsión 260 y real 255."""
+    cfg = _cfg(tmp_path)
+    _guardar_api(cfg, _nfp_api(200, None), _t(2025, 3, 6, 12))
+    _guardar_api(cfg, _nfp_api(260, 255), _t(2025, 3, 8, 12))
+    return cfg
+
+
+def test_sorpresa_usa_la_prevision_previa_al_evento(tmp_path):
+    cfg = _nfp_cambia_tras_el_evento(tmp_path)
+    for modo in ("mejor", "api"):
+        r = contexto("calendario", _t(2025, 3, 1), _t(2025, 4, 1), conocido_en=_t(2025, 3, 9),
+                     cfg=cfg, prevision=modo)
+        fila = r.iloc[0]
+        assert fila["real"] == pytest.approx(255)
+        assert fila["prevision"] == pytest.approx(200)
+        assert fila["sorpresa"] == pytest.approx(55)
+        assert fila["fuente_prevision"] == "api"
+
+
+def test_unir_contexto_sorpresa_con_prevision_previa(tmp_path):
+    cfg = _nfp_cambia_tras_el_evento(tmp_path)
+    precios = pd.DataFrame({"ts_cierre": pd.to_datetime(
+        ["2025-03-07 13:00", "2025-03-07 14:00", "2025-03-08 13:00"], utc=True).as_unit("us")})
+    r = unir_contexto(precios, {"calendario": []}, cfg=cfg)
+    assert pd.isna(r["sorpresa_ultimo"].iloc[0])
+    # Antes de la descarga posterior (sin real todavía en la versión vigente) no hay sorpresa;
+    # después, la sorpresa es contra la previsión previa (200), no la posterior (260).
+    assert pd.isna(r["sorpresa_ultimo"].iloc[1])
+    assert r["sorpresa_ultimo"].iloc[2] == pytest.approx(55)
+
+
+def test_evento_visto_por_primera_vez_tras_ocurrir_sin_prevision(tmp_path):
+    cfg = _cfg(tmp_path)
+    _guardar_api(cfg, _nfp_api(260, 255), _t(2025, 3, 8, 12))
+    fila = contexto("calendario", _t(2025, 3, 1), _t(2025, 4, 1), conocido_en=_t(2025, 3, 9),
+                    cfg=cfg).iloc[0]
+    assert fila["real"] == pytest.approx(255)
+    assert pd.isna(fila["prevision"]) and pd.isna(fila["sorpresa"])
+    assert fila["fuente_prevision"] is None
+    assert not fila["prevision_es_pit"]
+    precios = pd.DataFrame({"ts_cierre": pd.to_datetime(["2025-03-08 13:00"],
+                                                         utc=True).as_unit("us")})
+    assert pd.isna(unir_contexto(precios, {"calendario": []}, cfg=cfg)["sorpresa_ultimo"].iloc[0])
+
+
+def test_foto_ff_posterior_al_evento_no_es_prevision(tmp_path):
+    from datos.almacen import escribir_crudo
+    from datos.fuentes import forexfactory
+    cfg = _cfg(tmp_path)
+    ff = json.dumps([{"title": "Non-Farm Employment Change", "country": "USD",
+                      "date": "2025-03-07T08:30:00-05:00", "impact": "High", "forecast": "250K",
+                      "previous": "227K", "actual": "300K"}]).encode()
+    m = escribir_crudo(cfg.data_dir, ff, "forexfactory", "ff_thisweek", _t(2025, 3, 7, 20), "json")
+    forexfactory.procesar_crudo(cfg, ff, m)
+    for modo in ("mejor", "ff", "api"):
+        fila = contexto("calendario", _t(2025, 3, 1), _t(2025, 4, 1), conocido_en=_t(2025, 3, 9),
+                        cfg=cfg, prevision=modo).iloc[0]
+        assert pd.isna(fila["prevision"]) and pd.isna(fila["sorpresa"]), modo
+        assert not fila["prevision_es_pit"]
+    # Con una previsión de la API previa al evento, 'mejor' usa esa (no la de FF posterior).
+    _guardar_api(cfg, _nfp_api(200, None), _t(2025, 3, 6, 12))
+    r = contexto("calendario", _t(2025, 3, 1), _t(2025, 4, 1), conocido_en=_t(2025, 3, 9),
+                 cfg=cfg, fuente="fmp")
+    assert r.iloc[0]["prevision"] == pytest.approx(200)
+    assert r.iloc[0]["fuente_prevision"] == "api"

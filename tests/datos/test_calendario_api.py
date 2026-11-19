@@ -95,10 +95,18 @@ def test_historico_ts_anunciado_horizonte():
 
 
 def test_no_historico_prevision_es_pit():
-    for f in filas_fmp(historico=False):
+    antes = utc(2024, 1, 1)   # descarga anterior a todos los eventos del fixture (enero 2024)
+    for f in filas_fmp(historico=False, ts=antes):
         assert f["prevision_es_pit"] is True
-        assert f["ts_anunciado"] == f["ts_version"] == T0
+        assert f["ts_anunciado"] == f["ts_version"] == antes
         assert f["ts_conocido"] == f["ts_evento"]
+
+
+def test_descarga_posterior_al_evento_no_es_pit():
+    # Bajado después de que ocurrió: esa previsión puede ser posterior al dato.
+    for f in filas_fmp(historico=False, ts=T0):
+        assert f["ts_version"] == T0 > f["ts_evento"]
+        assert f["prevision_es_pit"] is False
 
 
 def test_eodhd_pagina_con_offset(cfg, monkeypatch):

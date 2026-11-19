@@ -179,7 +179,9 @@ class _Base:
                 "id_fuente": _id(it.get(m["id"])), "pais": pais, "divisa": divisa,
                 "evento": evento, "evento_fuente": titulo, "categoria": categoria,
                 "impacto": impacto, "unidad": it.get(m["unidad"]) or u1 or u2 or u3 or None,
-                "programado": True, "hora_exacta": exacta, "prevision_es_pit": not historico,
+                "programado": True, "hora_exacta": exacta,
+                # Solo es previa al dato si se bajó antes del evento (nunca en el histórico).
+                "prevision_es_pit": not historico and anunciado < ts_evento,
                 "real": real, "prevision": prev, "anterior": ant, "anterior_revisado": rev,
             })
         return pa.Table.from_pylist(filas, schema=ESQUEMA_CALENDARIO)

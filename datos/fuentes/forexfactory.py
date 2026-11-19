@@ -87,7 +87,8 @@ def normalizar_ff(cuerpo: bytes, ts_foto: datetime, mapa_eventos: dict,
             "id_fuente": None, "pais": None, "divisa": divisa, "evento": evento,
             "evento_fuente": it["title"], "categoria": categoria, "impacto": impacto,
             "unidad": u1 or u2 or u3, "programado": True, "hora_exacta": exacta,
-            "prevision_es_pit": True, "real": real, "prevision": prevision,
+            # Una foto tomada después del evento no trae una previsión previa al dato.
+            "prevision_es_pit": ts_foto < ts_evento, "real": real, "prevision": prevision,
             "anterior": anterior, "anterior_revisado": None,
         })
     return pa.Table.from_pylist(filas, schema=ESQUEMA_CALENDARIO)

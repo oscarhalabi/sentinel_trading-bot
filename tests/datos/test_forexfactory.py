@@ -65,6 +65,16 @@ def test_ff_hora_con_desplazamiento():
     assert f["prevision_es_pit"] and f["programado"] and f["impacto"] == "alto"
 
 
+def test_foto_posterior_al_evento_no_es_pit():
+    ctx = cargar_contexto()
+    despues = utc(2026, 11, 20, 14, 0)   # NFP a las 13:30 UTC; Tentative del 21 aún no
+    filas = normalizar_ff(FIX.read_bytes(), despues, cargar_eventos(),
+                          ctx["divisas_calendario"], ctx["impacto_min"]).to_pylist()
+    for f in filas:
+        assert f["prevision_es_pit"] is (f["ts_evento"] > despues), f["evento_fuente"]
+    assert por_titulo(filas, "Non-Farm Employment Change")["prevision_es_pit"] is False
+
+
 def test_evento_sin_hora_no_cuenta_como_exacto():
     f = por_titulo(norm(), "Tentative Event")
     assert not f["hora_exacta"]
