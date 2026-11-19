@@ -71,16 +71,16 @@ def test_publicacion_alfred():
 
 def test_estimar_publicacion_payems():
     payems = _serie(cargar_contexto(), "series_alfred", "PAYEMS")
-    # Fin de marzo de 1985 + 7 días = 1985-04-07, 08:30 NY (EST: 13:30 UTC).
-    assert estimar_publicacion(date(1985, 3, 1), payems) == utc(1985, 4, 7, 13, 30)
+    # Fin de marzo de 1985 + 10 días = 1985-04-10, 08:30 NY (EST: 13:30 UTC).
+    assert estimar_publicacion(date(1985, 3, 1), payems) == utc(1985, 4, 10, 13, 30)
 
 
 def test_estimar_publicacion_trimestral_y_semanal():
     ctx = cargar_contexto()
     gdp = _serie(ctx, "series_alfred", "GDP")
     icsa = _serie(ctx, "series_alfred", "ICSA")
-    # GDP del 2.º trimestre (periodo 1990-04-01): fin 1990-06-30 + 30 días = 1990-07-30.
-    assert estimar_publicacion(date(1990, 4, 1), gdp) == utc(1990, 7, 30, 12, 30)
+    # GDP del 2.º trimestre (periodo 1990-04-01): fin 1990-06-30 + 35 días = 1990-08-04.
+    assert estimar_publicacion(date(1990, 4, 1), gdp) == utc(1990, 8, 4, 12, 30)
     # ICSA de la semana que termina el sábado 1990-01-06 + 5 días = jueves 1990-01-11.
     assert estimar_publicacion(date(1990, 1, 6), icsa) == utc(1990, 1, 11, 13, 30)
 

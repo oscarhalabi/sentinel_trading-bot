@@ -44,7 +44,7 @@ def test_alfred_carga_en_bloque_estimada():
     viejas = [f for f in t if f["periodo"].year < 1960]
     assert len(viejas) == 36 and all(f["publicacion_estimada"] for f in viejas)
     ene = next(f for f in viejas if f["periodo"] == date(1950, 1, 1))
-    assert ene["ts_conocido"] == utc(1950, 2, 7, 13, 30)   # fin de enero + 7 días, 08:30 NY
+    assert ene["ts_conocido"] == utc(1950, 2, 10, 13, 30)   # fin de enero + 10 días, 08:30 NY
     assert not next(f for f in t if f["periodo"] == date(2024, 2, 1))["publicacion_estimada"]
 
 

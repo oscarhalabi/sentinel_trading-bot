@@ -113,3 +113,13 @@ def test_config_contexto_por_defecto(tmp_path):
 def test_config_contexto_invalida_aborta(tmp_path, var, valor):
     with pytest.raises(ConfigInvalida, match=var):
         cargar_config({"DATA_DIR": str(tmp_path), var: valor})
+
+
+def test_retrasos_alfred_prudentes():
+    # Máximo histórico conocido (I5): no se estima una publicación antes de lo posible.
+    from datos.contexto_conf import cargar_contexto
+    minimos = {"PAYEMS": 10, "UNRATE": 10, "CPIAUCSL": 18, "CPILFESL": 18, "RSAFS": 17,
+               "PCEPI": 35, "PCEPILFE": 35, "GDP": 35, "ICSA": 5}
+    reales = {s["id"]: s["retraso_tipico_dias"] for s in cargar_contexto()["series_alfred"]}
+    for sid, minimo in minimos.items():
+        assert reales[sid] >= minimo, sid

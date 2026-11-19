@@ -15,55 +15,56 @@
   "impacto_min": "medio",
   "horizonte_anuncio_dias": 7,
   "latencia_por_defecto": "5s",
+  "_nota": "retraso_tipico_dias de series_alfred: días tras el fin del periodo hasta su publicación, solo para estimar las cargas en bloque de ALFRED. Valores prudentes (el máximo histórico conocido, mejor tarde que pronto); se calibran con los vintages reales en la Task 12.",
   "series_alfred": [
     {
       "id": "PAYEMS",
       "hora": "08:30",
       "zona": "America/New_York",
-      "retraso_tipico_dias": 7
+      "retraso_tipico_dias": 10
     },
     {
       "id": "UNRATE",
       "hora": "08:30",
       "zona": "America/New_York",
-      "retraso_tipico_dias": 7
+      "retraso_tipico_dias": 10
     },
     {
       "id": "CPIAUCSL",
       "hora": "08:30",
       "zona": "America/New_York",
-      "retraso_tipico_dias": 14
+      "retraso_tipico_dias": 18
     },
     {
       "id": "CPILFESL",
       "hora": "08:30",
       "zona": "America/New_York",
-      "retraso_tipico_dias": 14
+      "retraso_tipico_dias": 18
     },
     {
       "id": "PCEPI",
       "hora": "08:30",
       "zona": "America/New_York",
-      "retraso_tipico_dias": 30
+      "retraso_tipico_dias": 35
     },
     {
       "id": "PCEPILFE",
       "hora": "08:30",
       "zona": "America/New_York",
-      "retraso_tipico_dias": 30
+      "retraso_tipico_dias": 35
     },
     {
       "id": "GDP",
       "hora": "08:30",
       "zona": "America/New_York",
-      "retraso_tipico_dias": 30,
+      "retraso_tipico_dias": 35,
       "frecuencia": "q"
     },
     {
       "id": "RSAFS",
       "hora": "08:30",
       "zona": "America/New_York",
-      "retraso_tipico_dias": 15
+      "retraso_tipico_dias": 17
     },
     {
       "id": "ICSA",

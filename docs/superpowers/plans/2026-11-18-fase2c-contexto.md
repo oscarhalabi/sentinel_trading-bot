@@ -301,6 +301,7 @@ tests/datos/test_*.py     uno por pieza; fixtures en tests/datos/fixtures/contex
 - [ ] **Step 2 (laptop):** `.env` con `FRED_API_KEY`, `FMP_API_KEY`, `EODHD_API_KEY`. `python -m pytest -q` completo → pasa.
 - [ ] **Step 3 (laptop):** primera foto `python -m datos contexto bajar ff`; **Oscar registra** la tarea con `scripts/instalar_tarea_ff.ps1` (primero `-DryRun`).
 - [ ] **Step 4 (laptop):** `contexto bajar alfred fred`; sustituir fixtures de FRED/ALFRED por respuestas reales recortadas; ajustar `normalizar_*` si el formato real difiere; tests → PASS.
+  - Calibrar `retraso_tipico_dias` de `series_alfred` en `datos/contexto.json` con los vintages reales (máximo retraso observado por serie; hoy son valores prudentes a mano).
 - [ ] **Step 5 (laptop):** `contexto probar-calendario --fuentes fmp,eodhd` (y `te` si llegó la cotización y Oscar la aprobó). Revisar el informe con Oscar; **Oscar elige la fuente y aprueba el pago**; fijar `DATOS_FUENTE_CALENDARIO` y `DATOS_FUENTE_CORPORATIVO`. Sustituir fixtures del calendario por reales.
 - [ ] **Step 6 (laptop):** `contexto bajar calendario --historico`, `cot`, `gld`, `corporativo`; sustituir fixtures por reales; `verificar`; explicar o corregir los graves.
   - Rellenar `cot.excepciones_publicacion` con las fechas reales de publicación de la CFTC en cierres del gobierno (2013, 2018-19) y festivos especiales.
