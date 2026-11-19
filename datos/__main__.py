@@ -220,6 +220,7 @@ def _faltantes(cat, simbolos) -> dict[str, int]:
 def _verificar(args, ruta, config) -> int:
     from datos import simbolos as sim
     from datos.calidad import escribir_informe, verificar
+    from datos.calidad_contexto import verificar_contexto
     from datos.catalogo import Catalogo
     from datos.config import cargar_config
 
@@ -243,6 +244,7 @@ def _verificar(args, ruta, config) -> int:
         if cat:
             cat.importar_accesos_reserva(cfg.data_dir)
         problemas = verificar(cfg, elegidos, cat, desde=args.desde)
+        problemas += verificar_contexto(cfg, cat, desde=args.desde)
         resumen = {"faltantes": _faltantes(cat, elegidos)} if cat else None
     finally:
         if cat:
