@@ -96,7 +96,34 @@ def test_cot_semana_faltante(tmp_path):
              date(2024, 1, 1))
     r = [p for p in verificar_contexto(_cfg(tmp_path), None) if p.tipo == "cot_semana_faltante"]
     assert [p.desde.date() for p in r] == [date(2024, 5, 21)]
-    assert r[0].simbolo == "oro" and r[0].gravedad == "aviso"
+    assert r[0].simbolo == "oro:legacy" and r[0].gravedad == "aviso"
+
+
+def test_cot_dos_informes_misma_semana_son_dos_filas(tmp_path):
+    martes = [date(2024, 5, 7), date(2024, 5, 14), date(2024, 5, 28)]
+    for informe in ("legacy", "tff"):
+        base = {"mercado": "oro", "informe": informe, "campo": "interes_abierto",
+                "ts_version": _t(2024, 6, 1), "publicacion_tardia": False}
+        filas = [{**base, "fecha_informe": d, "valor": 1.0,
+                  "ts_conocido": _t(d.year, d.month, d.day) + timedelta(days=3)}
+                 for d in martes]
+        escribir(tmp_path, pa.Table.from_pylist(filas, schema=ESQUEMA_COT), "cot", "cftc",
+                 f"oro_{informe}", date(2024, 1, 1))
+
+    class Cat:
+        def __init__(self):
+            self.filas = set()
+
+        def anotar_problema(self, tipo, simbolo, fuente, desde, hasta, gravedad, detalle):
+            clave = (tipo, simbolo, fuente, desde, hasta)
+            nueva = clave not in self.filas
+            self.filas.add(clave)
+            return nueva
+
+    cat = Cat()
+    r = [p for p in verificar_contexto(_cfg(tmp_path), cat) if p.tipo == "cot_semana_faltante"]
+    assert sorted(p.simbolo for p in r) == ["oro:legacy", "oro:tff"]
+    assert len(cat.filas) == 2
 
 
 def test_hueco_serie_fred_en_dias_habiles(tmp_path):

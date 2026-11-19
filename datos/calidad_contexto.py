@@ -191,7 +191,7 @@ def chequear_semanas_cot(cot: pd.DataFrame) -> list[Problema]:
         d += timedelta(days=(1 - d.weekday()) % 7)   # primer martes desde el primero
         while d <= fin:
             if d not in fechas:
-                salida.append(Problema("cot_semana_faltante", str(mercado), "cftc",
+                salida.append(Problema("cot_semana_faltante", f"{mercado}:{informe}", "cftc",
                                        _dia_utc(d), _dia_utc(d), "aviso", {"informe": informe}))
             d += timedelta(days=7)
     return salida
