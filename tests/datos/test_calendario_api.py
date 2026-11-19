@@ -232,10 +232,20 @@ def test_corporativo_split_y_dividendo(cfg):
     d = divs[date(2024, 3, 6)]
     assert d["importe"] == 0.04 and d["divisa"] == "USD" and d["fecha_anuncio"] == date(2024, 2, 21)
     assert d["simbolo"] == "NVDA.US" and d["fuente"] == "fmp"
-    # Anunciado el 2024-02-21: se conoce a las 09:30 NY (14:30 UTC).
-    assert d["ts_conocido"] == utc(2024, 2, 21, 14, 30)
+    # Anunciado el miércoles 2024-02-21 (quizás tras el cierre): se da por conocido en la
+    # apertura del siguiente día hábil, jueves 22 a las 09:30 NY (14:30 UTC).
+    assert d["ts_conocido"] == utc(2024, 2, 22, 14, 30)
     # Dividendo con fecha de anuncio vacía en la API: se trata como "sin anuncio".
     assert divs[date(2024, 6, 11)]["fecha_anuncio"] is None
+
+
+def test_dividendo_anunciado_antes_de_festivo_se_conoce_el_siguiente_habil():
+    # Anunciado el viernes 2024-05-24; el lunes 27 es Memorial Day → martes 28, 09:30 NY.
+    divs = json.dumps([{"date": "2024-06-05", "declarationDate": "2024-05-24",
+                        "dividend": 0.1}]).encode()
+    f = FMP(None).normalizar_corporativos([b"[]", divs], "NVDA.US").to_pylist()[0]
+    assert f["fecha_anuncio"] == date(2024, 5, 24)
+    assert f["ts_conocido"] == utc(2024, 5, 28, 13, 30)
 
 
 def test_corporativo_eodhd_ratio_y_ticker(cfg):

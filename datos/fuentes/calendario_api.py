@@ -27,6 +27,7 @@ from datos.config import Config, ConfigInvalida
 from datos.contexto_conf import cargar_contexto, cargar_eventos, normalizar_evento
 from datos.fuentes.base import ClienteHttp, ClienteRequests
 from datos.fuentes.forexfactory import NY, TIMEOUT, _numero
+from datos.horarios import es_habil_eeuu
 from datos.simbolos import Simbolo
 from datos.versiones import versionar
 
@@ -203,7 +204,9 @@ class _Base:
                 filas.append(("dividendo", *fila))
         salida = []
         for tipo, ex, anuncio, razon, importe, divisa in filas:
-            dia_conocido = anuncio or ex
+            # Con anuncio: apertura del SIGUIENTE día hábil (el anuncio puede salir tras el
+            # cierre y no sabemos a qué hora). Sin anuncio: apertura del día ex.
+            dia_conocido = _siguiente_habil(anuncio) if anuncio else ex
             conocido = datetime(dia_conocido.year, dia_conocido.month, dia_conocido.day, 9, 30,
                                 tzinfo=NY).astimezone(timezone.utc)
             salida.append({"simbolo": simbolo, "tipo": tipo, "fuente": self.nombre,
@@ -216,6 +219,14 @@ class _Base:
 
     def _dividendo(self, it: dict):
         raise NotImplementedError
+
+
+def _siguiente_habil(dia: date) -> date:
+    """El primer día hábil de EE. UU. después de `dia`."""
+    dia += timedelta(days=1)
+    while not es_habil_eeuu(dia):
+        dia += timedelta(days=1)
+    return dia
 
 
 def _fecha(v) -> date | None:
