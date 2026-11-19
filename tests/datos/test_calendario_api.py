@@ -258,3 +258,39 @@ def test_corporativo_omite_no_ee_uu(cfg, caplog):
 
 def test_registro_de_fuentes():
     assert FUENTES_CALENDARIO == {"fmp": FMP, "eodhd": EODHD}
+
+
+class HttpRoto:
+    def __init__(self):
+        self.urls = []
+
+    def get(self, url, timeout, headers=None):
+        raise ConnectionError(f"fallo de conexión a {url}")
+
+
+def test_error_de_red_no_filtra_la_clave(cfg, caplog):
+    with caplog.at_level("DEBUG"), pytest.raises(RuntimeError) as e:
+        bajar_calendario(cfg, "fmp", date(2024, 1, 1), date(2024, 1, 31), False, http=HttpRoto())
+    assert CLAVE_FMP not in str(e.value) and "ConnectionError" in str(e.value)
+    with caplog.at_level("DEBUG"), pytest.raises(RuntimeError) as e:
+        bajar_corporativos(cfg, "eodhd", [sim()], http=HttpRoto())
+    assert CLAVE_EODHD not in str(e.value)
+    assert CLAVE_FMP not in caplog.text and CLAVE_EODHD not in caplog.text
+
+
+def test_corporativo_redescarga_no_encoge_el_historial(cfg):
+    _, antes, _ = corporativo(cfg, "fmp", [("splits", leer("fmp_splits.json")),
+                                           ("dividends", leer("fmp_dividendos.json"))])
+    div = leer("fmp_dividendos.json")
+    # Respuesta vacía, y respuesta con una fila menos: lo guardado no cambia.
+    for splits, divs in ((b"[]", b"[]"), (json.dumps(json.loads(leer("fmp_splits.json"))[:1]).encode(), div)):
+        n, filas, _ = corporativo(cfg, "fmp", [("splits", splits), ("dividends", divs)])
+        assert n == 0 and filas == antes
+    # Una fila nueva se añade; una cambiada conserva lo guardado.
+    nuevo = json.loads(leer("fmp_splits.json")) + [{"symbol": "NVDA", "date": "2025-01-02",
+                                                     "numerator": 2, "denominator": 1}]
+    nuevo[0]["numerator"] = 99
+    n, filas, _ = corporativo(cfg, "fmp", [("splits", json.dumps(nuevo).encode()),
+                                           ("dividends", div)])
+    assert n == 1 and len(filas) == 5
+    assert next(f for f in filas if f["fecha_ex"] == date(2024, 6, 10))["razon"] == 10.0

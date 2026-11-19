@@ -129,7 +129,11 @@ class _Base:
         if self._http is None:
             self._http = ClienteRequests()
         url = f"{self._url_base}{ruta}?{urlencode({**params, self._param_clave: clave})}"
-        estado, cuerpo = self._http.get(url, TIMEOUT)
+        try:
+            estado, cuerpo = self._http.get(url, TIMEOUT)
+        except Exception as e:  # noqa: BLE001 - el mensaje de requests lleva la URL con la clave
+            raise RuntimeError(f"{self.nombre}: error de red en {ruta}: "
+                               f"{type(e).__name__}") from None
         if estado != 200:   # sin la URL: lleva la clave
             raise RuntimeError(f"{self.nombre}: HTTP {estado} en {ruta} {params}")
         return cuerpo
@@ -357,9 +361,36 @@ def bajar_calendario(cfg: Config, fuente: str, desde: date, hasta: date, histori
     return nuevas
 
 
+def _mezclar_corporativo(raiz: Path, nueva: pa.Table, fuente: str, simbolo: str) -> int:
+    """Une con lo guardado por (tipo, fecha_ex): nunca borra filas; añade las nuevas.
+
+    Si una fila guardada cambió en la API se conserva la guardada y se avisa en el log.
+    Solo escribe si hay algo nuevo (o si el archivo aún no existe). Devuelve las filas añadidas.
+    """
+    ruta = raiz / ruta_relativa("corporativo", fuente, simbolo, None)
+    if not ruta.exists():
+        escribir(raiz, nueva, "corporativo", fuente, simbolo, None)
+        return nueva.num_rows
+    previa = pq.read_table(ruta)
+    guardadas = {(f["tipo"], f["fecha_ex"]): f for f in previa.to_pylist()}
+    nuevas = []
+    for f in nueva.to_pylist():
+        k = (f["tipo"], f["fecha_ex"])
+        if k not in guardadas:
+            nuevas.append(f)
+        elif any(guardadas[k][c] != f[c] for c in ("razon", "importe", "fecha_anuncio")):
+            log.warning("%s: %s del %s cambió en la API; se conserva lo guardado",
+                        simbolo, k[0], k[1])
+    if not nuevas:
+        return 0
+    union = pa.concat_tables([previa, pa.Table.from_pylist(nuevas, schema=ESQUEMA_CORPORATIVO)])
+    escribir(raiz, union, "corporativo", fuente, simbolo, None)
+    return len(nuevas)
+
+
 def bajar_corporativos(cfg: Config, fuente: str, simbolos: list[Simbolo],
                        http: ClienteHttp | None = None) -> int:
-    """Splits y dividendos de cada símbolo de EE. UU. Devuelve las filas guardadas.
+    """Splits y dividendos de cada símbolo de EE. UU. Devuelve las filas nuevas guardadas (une con lo existente, no borra).
 
     Los símbolos que no terminan en `.US` se omiten (limitación) y se cuentan en el log.
     Si un símbolo falla se sigue con los demás y al final se lanza RuntimeError.
@@ -382,8 +413,7 @@ def bajar_corporativos(cfg: Config, fuente: str, simbolos: list[Simbolo],
         except Exception as e:  # noqa: BLE001 - seguimos con el resto
             fallos.append(f"{s.simbolo} ({e})")
             continue
-        escribir(raiz, tabla, "corporativo", fuente, s.simbolo, None)
-        filas += tabla.num_rows
+        filas += _mezclar_corporativo(raiz, tabla, fuente, s.simbolo)
     if omitidos:
         log.warning("%d símbolos no EE. UU. omitidos en corporativos (limitación de la Task 6)",
                     omitidos)
