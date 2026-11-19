@@ -508,3 +508,37 @@ def test_corporativo_desde_su_anuncio(tmp_path):
                            conocido_en=t, cfg=cfg)
     assert q(_t(2024, 2, 29)).empty
     assert list(q(_t(2024, 3, 2))["importe"]) == [0.5]
+
+
+_CAL = ["min_hasta_proximo", "proximo_evento", "min_desde_ultimo", "sorpresa_ultimo"]
+
+
+def _precios_simples():
+    return pd.DataFrame({"ts_cierre": pd.to_datetime(
+        [_t(2024, 3, 3), _t(2024, 3, 6)], utc=True).as_unit("us")})
+
+
+def test_unir_contexto_calendario_vacio_da_columnas_nulas(tmp_path):
+    r = unir_contexto(_precios_simples(), {"calendario": []}, cfg=_cfg(tmp_path))
+    assert set(_CAL) <= set(r.columns) and r[_CAL].isna().all().all()
+
+
+def test_unir_contexto_filtro_sin_eventos_da_columnas_nulas(tmp_path):
+    _guardar_calendario(tmp_path, [_evento(_t(2024, 3, 12, 12, 30), _t(2024, 3, 1),
+                                           real=1.0, prevision=0.5)])
+    cfg = _cfg(tmp_path)
+    r = unir_contexto(_precios_simples(), {"calendario": []}, divisas=["NOK"], cfg=cfg)
+    assert r[_CAL].isna().all().all()
+    antes = pd.DataFrame({"ts_cierre": pd.to_datetime([_t(2020, 1, 1)], utc=True).as_unit("us")})
+    r = unir_contexto(antes, {"calendario": []}, cfg=cfg)
+    assert r[_CAL].isna().all().all()
+
+
+def test_unir_contexto_claves_sin_datos_dan_columnas_nan(tmp_path):
+    r = unir_contexto(_precios_simples(), {"serie": ["DGS10"], "etf": ["GLD"], "cot": ["ORO"]},
+                      cfg=_cfg(tmp_path))
+    assert r["DGS10"].isna().all()
+    assert r["GLD_toneladas"].isna().all() and r["GLD_valor_usd"].isna().all()
+    from datos.contexto_conf import cargar_contexto
+    for campo in cargar_contexto()["cot"]["campos"]:
+        assert r[f"cot_ORO_{campo}"].isna().all()

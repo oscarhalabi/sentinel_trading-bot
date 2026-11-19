@@ -666,18 +666,27 @@ def _hasta_limite(df: pd.DataFrame, conocido: pd.Series, limite: pd.Timestamp | 
     return df[dentro], conocido[dentro]
 
 
+def _con_columnas(base: pd.DataFrame, columnas: list[str]) -> pd.DataFrame:
+    """Añade vacías (NaN) las columnas pedidas que no salieron: la forma de la salida no
+    depende de si hay datos."""
+    faltan = [c for c in columnas if c not in base.columns]
+    return base.assign(**{c: np.nan for c in faltan}) if faltan else base
+
+
 def _unir_serie(base, cfg, claves, lat, limite):
     df = _leer_contexto(cfg, "serie", None, claves or None)
     for sid, g in df.groupby("serie", sort=True):
         g, conocido = _hasta_limite(g, g["ts_conocido"] + lat, limite)
         base = _pegar(base, _escalon(conocido, g["periodo"],
                                      g[["valor"]].rename(columns={"valor": sid})))
-    return base
+    return _con_columnas(base, list(claves or []))
 
 
 def _unir_cot(base, cfg, claves, lat, limite, anios):
     df = _leer_contexto(cfg, "cot", None, claves or None, anios)
     campos = cargar_contexto()["cot"]["campos"]
+    # Columnas que siempre salen: cada campo configurado de cada mercado pedido.
+    esperadas = [f"cot_{m}_{c}" for m in (claves or []) for c in campos]
     for (mercado, campo), g in df[df["campo"].isin(campos)].groupby(["mercado", "campo"]):
         informe = next(i for i in _PRIORIDAD_COT if i in set(g["informe"]))
         g = g[g["informe"] == informe]
@@ -688,7 +697,7 @@ def _unir_cot(base, cfg, claves, lat, limite, anios):
         nombre = f"cot_{mercado}_{campo}"
         base = _pegar(base, _escalon(conocido, g["fecha_informe"],
                                      g[["valor"]].rename(columns={"valor": nombre})))
-    return base
+    return _con_columnas(base, esperadas)
 
 
 def _unir_etf(base, cfg, claves, lat, limite):
@@ -698,7 +707,8 @@ def _unir_etf(base, cfg, claves, lat, limite):
         valores = g[["toneladas", "valor_usd"]].rename(
             columns={"toneladas": f"{etf}_toneladas", "valor_usd": f"{etf}_valor_usd"})
         base = _pegar(base, _escalon(conocido, g["fecha"], valores))
-    return base
+    return _con_columnas(base, [f"{e}_{c}" for e in (claves or [])
+                                for c in ("toneladas", "valor_usd")])
 
 
 def _barrido(desde: np.ndarray, hasta: np.ndarray, prioridad: list[tuple],
@@ -743,6 +753,9 @@ def _unir_calendario(base, cfg, fuentes, lat, prevision, impacto_min, divisas, l
     if divisas:
         df = df[df["divisa"].isin(divisas)]
     df = df.reset_index(drop=True)
+    if df.empty:   # nada pasa los filtros: las cuatro columnas salen vacías
+        return base.assign(min_hasta_proximo=np.nan, proximo_evento=None,
+                           min_desde_ultimo=np.nan, sorpresa_ultimo=np.nan)
     sin_siguiente = df["_siguiente"].isna().to_numpy()
     fin_version = np.where(sin_siguiente, _SIN_FIN,
                            _ns(df["_siguiente"].fillna(df["ts_version"])))
