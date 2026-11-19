@@ -106,3 +106,66 @@ def test_una_serie_falla_las_demas_se_guardan(tmp_path):
     with pytest.raises(RuntimeError, match="PAYEMS"):
         bajar_series(cfg(tmp_path), http, ids=["PAYEMS", "DGS10"])
     assert leer_manifiesto(tmp_path, "serie/fuente=fred/simbolo=DGS10/completo.parquet") is not None
+
+
+# --- I4: una respuesta vacía o truncada no borra el historial ---------------------------
+
+def _guardar(c, cuerpo, ts, nombre="alfred_PAYEMS"):
+    from datos.almacen import escribir_crudo
+    from datos.fuentes.fred import procesar_crudo
+    m = escribir_crudo(c.data_dir, cuerpo, nombre.split("_")[0], nombre, ts, "json")
+    return procesar_crudo(c, cuerpo, m)
+
+
+def _filas_guardadas(tmp_path, fuente="alfred", sid="PAYEMS"):
+    import pyarrow.parquet as pq
+    return pq.read_table(tmp_path / "serie" / f"fuente={fuente}" / f"simbolo={sid}"
+                         / "completo.parquet").to_pylist()
+
+
+def test_respuesta_vacia_no_borra_el_historial(tmp_path):
+    from datos.contexto_bajar import reprocesar
+    c = cfg(tmp_path)
+    assert _guardar(c, (FIX / "alfred_payems.json").read_bytes(), utc(2025, 3, 8)) == 40
+    antes = _filas_guardadas(tmp_path)
+    assert len(antes) == 40
+    assert _guardar(c, b'{"observations": []}', utc(2025, 3, 9)) == 0
+    assert _filas_guardadas(tmp_path) == antes
+    r = reprocesar(c, ["alfred"])
+    assert not r.fallidos
+    assert sorted(map(str, _filas_guardadas(tmp_path))) == sorted(map(str, antes))
+
+
+def test_version_nueva_se_suma_y_cierra_la_anterior(tmp_path):
+    c = cfg(tmp_path)
+    _guardar(c, (FIX / "alfred_payems.json").read_bytes(), utc(2025, 3, 8))
+    nueva = {"observations": [{"realtime_start": "2024-06-07", "realtime_end": "9999-12-31",
+                               "date": "2024-03-01", "value": "999"}]}
+    assert _guardar(c, json.dumps(nueva).encode(), utc(2025, 3, 9)) == 1
+    marzo = sorted((f for f in _filas_guardadas(tmp_path) if f["periodo"] == date(2024, 3, 1)),
+                   key=lambda f: f["ts_conocido"])
+    assert len(marzo) == 3
+    assert marzo[1]["ts_hasta"] == marzo[2]["ts_conocido"] == utc(2024, 6, 7, 12, 30)
+    assert marzo[2]["ts_hasta"] is None and marzo[2]["valor"] == 999.0
+
+
+def test_respuesta_truncada_falla_sin_escribir(tmp_path):
+    c = cfg(tmp_path)
+    _guardar(c, (FIX / "alfred_payems.json").read_bytes(), utc(2025, 3, 8))
+    antes = _filas_guardadas(tmp_path)
+    datos = json.loads((FIX / "alfred_payems.json").read_bytes())
+    corta = {"count": len(datos["observations"]) + 5, "observations": datos["observations"][:3]}
+    with pytest.raises(RuntimeError, match="truncada"):
+        _guardar(c, json.dumps(corta).encode(), utc(2025, 3, 9))
+    assert _filas_guardadas(tmp_path) == antes
+
+
+def test_bajar_respuesta_truncada_no_guarda_crudo(tmp_path):
+    class Truncada(HttpFalso):
+        def get(self, url, timeout, headers=None):
+            self.urls.append(url)
+            return 200, b'{"count": 10, "observations": []}'
+    with pytest.raises(RuntimeError, match="truncada"):
+        bajar_series(cfg(tmp_path), Truncada(), ids=["PAYEMS"])
+    assert list(listar_crudos(tmp_path, "alfred")) == []
+    assert not (tmp_path / "serie").exists()

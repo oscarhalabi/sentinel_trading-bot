@@ -2,14 +2,17 @@
 from __future__ import annotations
 
 import json
+import logging
 from datetime import date, datetime, timezone
 from pathlib import Path
 from urllib.parse import urlencode
 
 import pandas as pd
 import pyarrow as pa
+import pyarrow.parquet as pq
 
-from datos.almacen import ESQUEMA_SERIE, Manifiesto, escribir, escribir_crudo, nombre_crudo
+from datos.almacen import (ESQUEMA_SERIE, Manifiesto, escribir, escribir_crudo, nombre_crudo,
+                           ruta_relativa)
 from datos.config import Config, ConfigInvalida
 from datos.contexto_conf import cargar_contexto
 from datos.fuentes.base import ClienteHttp, ClienteRequests
@@ -20,9 +23,21 @@ URL_OBSERVACIONES = "https://api.stlouisfed.org/fred/series/observations"
 TIMEOUT = 60.0
 _VENTANA_ALFRED = {"realtime_start": "1776-07-04", "realtime_end": "9999-12-31"}
 
+log = logging.getLogger(__name__)
+
 
 def _observaciones(cuerpo: bytes) -> list[dict]:
     return json.loads(cuerpo).get("observations", [])
+
+
+def comprobar_completa(cuerpo: bytes, serie_id: str) -> None:
+    """Error si la respuesta dice tener más observaciones (`count`) de las que trae: está
+    truncada (p. ej. por el límite de filas de la API) y no se puede guardar como si fuera toda."""
+    datos = json.loads(cuerpo)
+    total, recibidas = datos.get("count"), len(datos.get("observations", []))
+    if total is not None and int(total) > recibidas:
+        raise RuntimeError(f"Respuesta truncada de {serie_id}: dice {total} observaciones y "
+                           f"trae {recibidas}; no se guarda nada")
 
 
 def _valor(texto: str) -> float | None:
@@ -82,11 +97,46 @@ def _url(cfg: Config, serie_id: str, alfred: bool, con_clave: bool) -> str:
     return f"{URL_OBSERVACIONES}?{urlencode(params)}"
 
 
+def _mezclar(raiz: Path, nueva: pa.Table, fuente: str, sid: str, origen: dict) -> int:
+    """Une con lo guardado por (periodo, ts_conocido): nunca quita filas, solo añade las nuevas.
+
+    Si una fila guardada cambió en la respuesta se conserva la guardada y se avisa en el log.
+    En ALFRED, `ts_hasta` se recalcula con todas las versiones (la siguiente de cada periodo).
+    Escribe solo si hay algo nuevo (o si aún no existe el archivo). Devuelve las filas añadidas.
+    """
+    ruta = raiz / ruta_relativa("serie", fuente, sid, None)
+    if not ruta.exists():
+        escribir(raiz, nueva, "serie", fuente, sid, None, origen=origen)
+        return nueva.num_rows
+    previa = pq.read_table(ruta).select(ESQUEMA_SERIE.names).cast(ESQUEMA_SERIE).to_pylist()
+    guardadas = {(f["periodo"], f["ts_conocido"]): f for f in previa}
+    nuevas = []
+    for f in nueva.to_pylist():
+        g = guardadas.get((f["periodo"], f["ts_conocido"]))
+        if g is None:
+            nuevas.append(f)
+        elif g["valor"] != f["valor"]:
+            log.warning("%s: el valor de %s (conocido %s) cambió; se conserva lo guardado",
+                        sid, f["periodo"], f["ts_conocido"])
+    if not nuevas:
+        return 0
+    filas = sorted(previa + nuevas, key=lambda f: (f["periodo"], f["ts_conocido"]))
+    if fuente == "alfred":
+        for a, b in zip(filas, filas[1:]):
+            a["ts_hasta"] = b["ts_conocido"] if a["periodo"] == b["periodo"] else None
+        if filas:
+            filas[-1]["ts_hasta"] = None
+    escribir(raiz, _tabla(filas), "serie", fuente, sid, None, origen=origen)
+    return len(nuevas)
+
+
 def procesar_crudo(cfg: Config, cuerpo: bytes, meta: Manifiesto) -> int:
-    """Normaliza un crudo guardado (`alfred_<ID>` o `fred_<ID>`) y escribe la serie entera.
+    """Normaliza un crudo guardado (`alfred_<ID>` o `fred_<ID>`) y lo une con lo guardado
+    (nunca quita filas: una respuesta vacía no borra el historial). Una respuesta truncada
+    (`count` mayor que lo recibido) da error sin escribir nada.
 
     Es el mismo camino que usa la descarga en vivo; `reprocesar` lo usa sin red.
-    Devuelve las filas escritas.
+    Devuelve las filas nuevas.
     """
     fuente, _, sid = nombre_crudo(meta).partition("_")
     if fuente not in ("alfred", "fred") or not sid:
@@ -97,15 +147,15 @@ def procesar_crudo(cfg: Config, cuerpo: bytes, meta: Manifiesto) -> int:
                 None)
     if conf is None:
         raise ValueError(f"La serie {sid} ya no está en contexto.json ({fuente})")
+    comprobar_completa(cuerpo, sid)
     tabla = (normalizar_alfred if alfred else normalizar_fred)(cuerpo, conf)
-    escribir(Path(cfg.data_dir), tabla, "serie", fuente, sid, None,
-             origen={"url": _url(cfg, sid, alfred, False)})
-    return tabla.num_rows
+    return _mezclar(Path(cfg.data_dir), tabla, fuente, sid,
+                    {"url": _url(cfg, sid, alfred, False)})
 
 
 def bajar_series(cfg: Config, http: ClienteHttp | None = None,
                  ids: list[str] | None = None) -> dict[str, int]:
-    """Baja y guarda las series de contexto.json. Devuelve las filas por serie.
+    """Baja y guarda las series de contexto.json. Devuelve las filas nuevas por serie.
 
     Si alguna serie falla, las demás se guardan igual y al final se lanza RuntimeError
     con la lista de las que fallaron.
@@ -125,6 +175,7 @@ def bajar_series(cfg: Config, http: ClienteHttp | None = None,
             estado, cuerpo = http.get(_url(cfg, sid, alfred, True), TIMEOUT)
             if estado != 200:
                 raise RuntimeError(f"HTTP {estado}")
+            comprobar_completa(cuerpo, sid)   # truncada: ni siquiera se guarda el crudo
             fuente = "alfred" if alfred else "fred"
             # El cuerpo de la respuesta no lleva la clave; la URL guardada tampoco.
             m = escribir_crudo(Path(cfg.data_dir), cuerpo, fuente, f"{fuente}_{sid}",
