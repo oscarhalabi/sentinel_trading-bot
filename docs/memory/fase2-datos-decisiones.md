@@ -120,6 +120,40 @@ Rama `fase2/datos-historicos`, PR oscarhalabi/sentinel_trading-bot#3.
     Hay 53 avisos de conteo, todos domingos flojos. Los 36.505 avisos de `salto` siguen: el umbral
     de 8 desviaciones es muy sensible para el oro (pendiente afinarlo).
 
+## Estado de 2C (2026-11-19)
+
+- Diseño y plan: `docs/superpowers/specs/2026-11-18-fase2c-contexto-design.md` y
+  `docs/superpowers/plans/2026-11-18-fase2c-contexto.md` (PR #5, mergeado).
+- Código en la rama `datos/contexto` (tareas 1–11 y el paso 1 de la 12, por subagentes con revisión por
+  tarea y revisión final). Tests de `datos/` + script ps1: 368 pasan con Postgres de prueba.
+- **Falta la Task 12 en la laptop (pasos 2–8):** claves en `.env`, primera foto de FF y registrar
+  `SentinelDatosFF` (Oscar, con `scripts/instalar_tarea_ff.ps1 -DryRun` primero), bajar ALFRED/FRED y
+  calibrar `retraso_tipico_dias` con los vintages reales, `contexto probar-calendario` → **Oscar elige la
+  API y aprueba el pago**, calendario histórico, COT (rellenar `cot.excepciones_publicacion` con fechas
+  reales de la CFTC en cierres del gobierno y comprobar festivos en lunes), GLD, corporativos, sustituir
+  todos los fixtures provisionales por respuestas reales, comprobar 3 NFP a mano, docs y skill.
+- Decisiones tomadas al implementar (Rulings del ledger):
+  - Cada evento lleva cuándo se anunció (`ts_anunciado`), cuándo se conoce el dato real (`ts_conocido`)
+    y cuándo se guardó cada versión (`ts_version`). La previsión de una versión se conoce desde su
+    `ts_version`; **la sorpresa solo usa la previsión de la última versión guardada antes del evento**
+    (si no hay, vacía). Fue el fallo crítico que encontró la revisión final.
+  - Clave de versionado: fuente + id de la API si existe; si no (FF), evento + divisa + día de Nueva York.
+    Un cambio de hora el mismo día es versión; un cambio a otro día crea otro evento (el viejo queda).
+  - Tolerancia de versionado 1e-6 (el ruido de redondeo no crea versiones).
+  - Días hábiles de EE. UU. = lunes a viernes sin festivos federales observados (`horarios.es_habil_eeuu`).
+  - ALFRED: solo las primeras versiones cargadas en bloque se marcan como estimadas; las revisiones
+    generales no. Retrasos típicos prudentes (PAYEMS 10 días, CPI 18, PCE/PIB 35...).
+  - COT: primera carga de cada (mercado, informe, año) visible desde su publicación; correcciones con la
+    hora de descarga; semana con festivo federal → siguiente día hábil 15:30 NY.
+  - Nunca se encoge el historial: FRED/ALFRED, GLD y corporativos se unen con lo guardado; una respuesta
+    vacía o truncada no borra nada (truncada → error).
+  - `reprocesar` rehace desde el crudo y, si algo falla, deja todo como estaba.
+  - Dividendos conocidos en la apertura del día hábil siguiente al anuncio.
+  - Festivos de FF se guardan (categoría "festivo"); eventos sin hora exacta: dato real al final del día de
+    Nueva York y fuera de `unir_contexto`.
+  - Si se cambia `retraso_tipico_dias` u hora de una serie, correr `python -m datos contexto reprocesar alfred`.
+  - La tarea `SentinelDatosFF` corre solo con la sesión de Oscar abierta (recupera al iniciar sesión).
+
 ## Pendientes
 
 1. ~~Spec y plan de 2A~~ (PR #3 mergeado). Código de 2A en `datos/base-almacen`, con la Task 11 hecha:

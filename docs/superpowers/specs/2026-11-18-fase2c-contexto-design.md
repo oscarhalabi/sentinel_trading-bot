@@ -78,8 +78,9 @@ inflacion, tipos, pib, consumo, actividad, vivienda, balanza, otros), `impacto` 
 - **Dato real:** `ts_conocido = ts_evento`. La latencia del bot **no** se guarda: es un parámetro de
   la consulta (§6), por defecto 5 s.
 - **Previsión:** se guardan las dos. La de la API, con `prevision_es_pit = false` (puede ser la
-  última que guardó el proveedor). La de cada foto de FF, como fila propia con
-  `ts_conocido = ts_foto` y `prevision_es_pit = true`.
+  última que guardó el proveedor). La de cada foto de FF, como versión propia con
+  `ts_version = ts_foto` y `prevision_es_pit = true` (la previsión se conoce desde `ts_version`; `ts_conocido` es
+  solo para el dato real).
 - **Existencia del evento (dos instantes por fila; decisión de Claude tras la revisión):** la consulta
   muestra el evento desde `ts_anunciado` con `real`/`sorpresa` vacíos, y el dato real solo desde
   `ts_conocido + latencia`. Así funciona "evitar" (saber qué viene) sin ver el futuro.
@@ -94,8 +95,10 @@ inflacion, tipos, pib, consumo, actividad, vivienda, balanza, otros), `impacto` 
 - **Re-descargas de la API (solo se añade, nunca se reescribe):** cada descarga diaria que cambia
   algo de un evento (previsión, real, hora) añade una versión con `ts_version` = hora de descarga.
   Las filas idénticas no se duplican. Desde que empezamos a descargar, la previsión de la API también
-  queda guardada tal como estaba en cada momento (`prevision_es_pit = true`); en el histórico
-  bajado de golpe, `false`.
+  queda guardada tal como estaba en cada momento: `prevision_es_pit = true` solo si esa versión se
+  guardó **antes** del evento; en el histórico bajado de golpe, o en una descarga posterior al
+  evento, `false`. Para la sorpresa solo se usa la previsión de la última versión guardada antes del
+  evento (si no hay ninguna, la sorpresa queda vacía).
 - **Emparejar Forex Factory con la API** (para `prevision="mejor"` y el cruce de §9): mismo `evento`
   normalizado, misma `divisa` y `ts_evento` a ±90 min. Lo que no empareja se lista en el informe.
 - **Normalización de nombres:** un diccionario versionado (`datos/eventos.json`) mapea nombres de
@@ -143,7 +146,7 @@ America/New_York (parámetro `retraso_etf`).
 
 Columnas: `simbolo` (canónico del registro), `tipo` (split, dividendo), `fecha_ex`,
 `fecha_anuncio` (nula si la fuente no la da), `razon` (splits), `importe` y `divisa` (dividendos),
-`ts_conocido` = `fecha_anuncio` o, si falta, apertura del día ex.
+`ts_conocido` = apertura (09:30 NY) del día hábil siguiente a `fecha_anuncio` (el anuncio puede salir tras el cierre) o, si falta, apertura del día ex.
 
 ### 4.6 Crudo
 

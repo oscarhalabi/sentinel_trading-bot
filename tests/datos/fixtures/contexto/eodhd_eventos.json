@@ -1,0 +1,5 @@
+[
+ {"id":"e1","type":"Nonfarm Payrolls","country":"US","date":"2024-01-05 13:30:00","actual":216,"previous":173,"estimate":170,"importance":3},
+ {"id":"e2","type":"GDP Growth Rate QoQ","country":"GB","date":"2024-01-11 07:00:00","actual":null,"previous":-0.1,"estimate":0.0,"importance":2},
+ {"id":"e3","type":"Consumer Confidence","country":"US","date":"2024-01-12 15:00:00","actual":null,"previous":69,"estimate":70,"importance":1}
+]

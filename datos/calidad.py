@@ -31,6 +31,7 @@ FACTOR_SALTO = 8.0
 TICKS_REVERSION = 5
 RAZONES_SPLIT = (2, 3, 4, 5, 10)
 TOLERANCIA_SPLIT = 0.03
+DIAS_CRECIMIENTO = 30
 ORDEN_GRAVEDAD = ("grave", "aviso", "info")
 
 
@@ -291,7 +292,15 @@ def escribir_informe(cfg: Config, problemas: list[Problema],
     registro = _registro()
     bajado: dict[tuple[str, str], list[int]] = defaultdict(lambda: [0, 0])
     por_clase: dict[str, int] = defaultdict(int)
+    por_tipo: dict[str, list[int]] = defaultdict(lambda: [0, 0])   # [bytes, bytes del último mes]
+    hace_un_mes = datetime.now(timezone.utc) - timedelta(days=DIAS_CRECIMIENTO)
     for m in listar_manifiestos(cfg.data_dir):
+        por_tipo[m.tipo][0] += m.bytes
+        try:
+            if datetime.fromisoformat(m.descargado_en) >= hace_un_mes:
+                por_tipo[m.tipo][1] += m.bytes
+        except ValueError:
+            pass
         if m.tipo == "ticks":
             bajado[(m.simbolo, m.fuente)][0 if m.estado == "ok" else 1] += 1
         s = registro.get(m.simbolo)
@@ -311,6 +320,18 @@ def escribir_informe(cfg: Config, problemas: list[Problema],
     partes.append(_tabla_html(["Clase", "GB"], [[c, f"{b / 1e9:.3f}"]
                                                 for c, b in sorted(por_clase.items())])
                   if por_clase else "<p>Sin datos.</p>")
+    partes.append("<h2>Tamaño por tipo</h2>")
+    partes.append(_tabla_html(["Tipo", "GB", "Crecimiento último mes (GB)"],
+                              [[t, f"{v[0] / 1e9:.3f}", f"{v[1] / 1e9:.3f}"]
+                               for t, v in sorted(por_tipo.items())])
+                  if por_tipo else "<p>Sin datos.</p>")
+    previsiones = (resumen_descarga or {}).get("previsiones")
+    if previsiones:
+        partes.append("<h2>Previsión de la API frente a Forex Factory</h2>")
+        partes.append(_tabla_html(
+            ["Evento", "Fuente", "Emparejados", "Mediana |API − FF|", "p90 |API − FF|"],
+            [[e["evento"], e["fuente"], e["emparejados"], f"{e['mediana']:.4g}",
+              f"{e['p90']:.4g}"] for e in previsiones]))
     partes.append("<h2>Problemas nuevos</h2>")
     if not problemas:
         partes.append("<p>Ninguno.</p>")

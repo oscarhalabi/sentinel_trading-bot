@@ -1,0 +1,148 @@
+{
+  "divisas_calendario": [
+    "USD",
+    "EUR",
+    "GBP",
+    "JPY",
+    "CHF",
+    "AUD",
+    "CAD",
+    "NZD",
+    "NOK",
+    "SEK",
+    "CNY"
+  ],
+  "impacto_min": "medio",
+  "horizonte_anuncio_dias": 7,
+  "latencia_por_defecto": "5s",
+  "_nota": "retraso_tipico_dias de series_alfred: días tras el fin del periodo hasta su publicación, solo para estimar las cargas en bloque de ALFRED. Valores prudentes (el máximo histórico conocido, mejor tarde que pronto); se calibran con los vintages reales en la Task 12.",
+  "series_alfred": [
+    {
+      "id": "PAYEMS",
+      "hora": "08:30",
+      "zona": "America/New_York",
+      "retraso_tipico_dias": 10
+    },
+    {
+      "id": "UNRATE",
+      "hora": "08:30",
+      "zona": "America/New_York",
+      "retraso_tipico_dias": 10
+    },
+    {
+      "id": "CPIAUCSL",
+      "hora": "08:30",
+      "zona": "America/New_York",
+      "retraso_tipico_dias": 18
+    },
+    {
+      "id": "CPILFESL",
+      "hora": "08:30",
+      "zona": "America/New_York",
+      "retraso_tipico_dias": 18
+    },
+    {
+      "id": "PCEPI",
+      "hora": "08:30",
+      "zona": "America/New_York",
+      "retraso_tipico_dias": 35
+    },
+    {
+      "id": "PCEPILFE",
+      "hora": "08:30",
+      "zona": "America/New_York",
+      "retraso_tipico_dias": 35
+    },
+    {
+      "id": "GDP",
+      "hora": "08:30",
+      "zona": "America/New_York",
+      "retraso_tipico_dias": 35,
+      "frecuencia": "q"
+    },
+    {
+      "id": "RSAFS",
+      "hora": "08:30",
+      "zona": "America/New_York",
+      "retraso_tipico_dias": 17
+    },
+    {
+      "id": "ICSA",
+      "hora": "08:30",
+      "zona": "America/New_York",
+      "retraso_tipico_dias": 5,
+      "frecuencia": "w"
+    }
+  ],
+  "series_fred": [
+    {
+      "id": "DGS10",
+      "retraso": "habil+1@16:30"
+    },
+    {
+      "id": "DGS2",
+      "retraso": "habil+1@16:30"
+    },
+    {
+      "id": "DFII10",
+      "retraso": "habil+1@16:30"
+    },
+    {
+      "id": "T10YIE",
+      "retraso": "habil+1@16:30"
+    },
+    {
+      "id": "DFF",
+      "retraso": "habil+1@16:30"
+    },
+    {
+      "id": "VIXCLS",
+      "retraso": "mismo@17:00"
+    },
+    {
+      "id": "DTWEXBGS",
+      "retraso": "lunes@16:30"
+    }
+  ],
+  "cot": {
+    "_nota": "lista de campos provisional; el cruce con las columnas de la CFTC se hace en la Task 7",
+    "mercados": {
+      "ORO": "088691",
+      "PLATA": "084691",
+      "COBRE": "085692",
+      "WTI": "067651",
+      "EUR": "099741",
+      "GBP": "096742",
+      "JPY": "097741",
+      "CHF": "092741",
+      "CAD": "090741",
+      "AUD": "232741",
+      "NZD": "112741",
+      "SP500": "13874A",
+      "NASDAQ100": "209742",
+      "DOW": "124603",
+      "BONO10": "043602"
+    },
+    "campos": [
+      "interes_abierto",
+      "no_comerciales_largos",
+      "no_comerciales_cortos",
+      "comerciales_largos",
+      "comerciales_cortos",
+      "gestores_largos",
+      "gestores_cortos",
+      "fondos_largos",
+      "fondos_cortos"
+    ],
+    "excepciones_publicacion": {},
+    "primera_publicacion": {
+      "disaggregated": "2009-09-04",
+      "tff": "2009-09-04"
+    }
+  },
+  "etf": {
+    "GLD": {
+      "hora": "18:00"
+    }
+  }
+}

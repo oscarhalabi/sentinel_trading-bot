@@ -1,9 +1,9 @@
 """Pruebas de abierto() y los feriados."""
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 import pytest
 
-from datos.horarios import FERIADOS_FIJOS, abierto
+from datos.horarios import FERIADOS_FIJOS, abierto, es_habil_eeuu
 
 
 def utc(*a):
@@ -90,3 +90,17 @@ def test_indice_us_festivos_nyse():
     # Viernes después de Acción de Gracias: cierra a las 13:00 NY (18:00 UTC).
     assert abierto("indice_us", utc(2024, 11, 29, 15, 0))
     assert not abierto("indice_us", utc(2024, 11, 29, 18, 30))
+
+
+def test_es_habil_eeuu():
+    assert es_habil_eeuu(date(2024, 7, 3))
+    assert not es_habil_eeuu(date(2024, 7, 4))       # Independencia
+    assert not es_habil_eeuu(date(2024, 5, 11))      # sábado
+    assert not es_habil_eeuu(date(2024, 10, 14))     # Colón (la bolsa abre, la Fed no)
+    assert not es_habil_eeuu(date(2023, 11, 10))     # Veteranos (sáb 11) observado el viernes
+    assert not es_habil_eeuu(date(2021, 12, 31))     # 1 de enero de 2022 en sábado
+    assert not es_habil_eeuu(date(2023, 1, 2))       # 1 de enero en domingo → lunes
+    assert not es_habil_eeuu(date(2022, 6, 20))      # Juneteenth (dom 19) → lunes
+    assert es_habil_eeuu(date(2024, 3, 29))          # Viernes Santo: no es festivo federal
+    assert es_habil_eeuu(date(1985, 1, 21))          # MLK aún no existía
+    assert not es_habil_eeuu(date(1975, 10, 27))     # Veteranos en octubre (1971-1977)

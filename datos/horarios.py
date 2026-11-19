@@ -99,6 +99,50 @@ def _festivos_federales(anio: int) -> list[date]:
 
 
 @lru_cache(maxsize=None)
+def _festivos_eeuu_civiles(anio: int) -> frozenset[date]:
+    """Los 11 festivos federales de EE. UU. con su fecha observada (oficinas del Gobierno).
+
+    Distinto de los festivos de bolsa: aquí cuentan también Colón y Veteranos, y no el
+    Viernes Santo. Se usa para el "día hábil" de las publicaciones (Fed, Tesoro, BLS).
+    Incluye el viernes 31 de diciembre cuando el 1 de enero del año siguiente cae en sábado.
+    """
+    dias = [
+        _observado(date(anio, 1, 1)),
+        _observado(date(anio, 7, 4)),
+        _enesimo(anio, 9, 0, 1),     # Labor Day
+        _enesimo(anio, 11, 3, 4),    # Acción de Gracias
+        _observado(date(anio, 12, 25)),
+    ]
+    siguiente_anio_nuevo = date(anio + 1, 1, 1)
+    if siguiente_anio_nuevo.weekday() == 5:
+        dias.append(date(anio, 12, 31))
+    if anio >= 1986:
+        dias.append(_enesimo(anio, 1, 0, 3))   # Martin Luther King
+    if anio >= 1971:  # ley de lunes festivos (Uniform Monday Holiday Act)
+        dias += [
+            _enesimo(anio, 2, 0, 3),    # Presidentes
+            _enesimo(anio, 5, 0, -1),   # Memorial Day
+            _enesimo(anio, 10, 0, 2),   # Colón
+        ]
+    else:
+        dias += [_observado(date(anio, 2, 22)), _observado(date(anio, 5, 30)),
+                 _observado(date(anio, 10, 12))]
+    if 1971 <= anio <= 1977:
+        dias.append(_enesimo(anio, 10, 0, 4))   # Veteranos (cuarto lunes de octubre)
+    else:
+        dias.append(_observado(date(anio, 11, 11)))
+    if anio >= 2021:
+        dias.append(_observado(date(anio, 6, 19)))  # Juneteenth
+    # Un 1 de enero en sábado se observa el 31 de diciembre del año anterior: no es de este año.
+    return frozenset(d for d in dias if d.year == anio)
+
+
+def es_habil_eeuu(dia: date) -> bool:
+    """True si `dia` es de lunes a viernes y no es festivo federal de EE. UU. (fecha observada)."""
+    return dia.weekday() < 5 and dia not in _festivos_eeuu_civiles(dia.year)
+
+
+@lru_cache(maxsize=None)
 def _festivos(mercado: str, anio: int) -> dict[date, str]:
     """{día: 'cerrado' | 'temprano'} para 'cme' o 'nyse'."""
     salida: dict[date, str] = {}
