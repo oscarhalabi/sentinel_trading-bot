@@ -75,14 +75,19 @@ def normalizar_gld(csv_bytes: bytes, etf_conf: dict) -> pa.Table:
 def _mezclar(raiz: Path, nueva: pa.Table) -> int:
     """Une con lo guardado por `fecha`: nunca borra; añade las fechas nuevas.
 
+    Una fecha repetida dentro del mismo CSV cuenta una vez (la última fila).
     Si una fecha guardada cambió en el CSV se conserva la guardada y se avisa en el log.
     Solo escribe si hay algo nuevo. Devuelve las filas añadidas.
     """
     ruta = raiz / ruta_relativa("etf", "spdr", "GLD", None)
     previa = pq.read_table(ruta) if ruta.exists() else None
     guardadas = {f["fecha"]: f for f in previa.to_pylist()} if previa is not None else {}
+    unicas = {f["fecha"]: f for f in nueva.to_pylist()}   # la última de cada fecha
+    if len(unicas) < nueva.num_rows:
+        log.warning("GLD: %d filas con fecha repetida en el CSV; se usa la última",
+                    nueva.num_rows - len(unicas))
     nuevas = []
-    for f in nueva.to_pylist():
+    for f in unicas.values():
         g = guardadas.get(f["fecha"])
         if g is None:
             nuevas.append(f)

@@ -77,6 +77,19 @@ def test_bajar_gld_no_encoge_el_historico(cfg, tmp_path, caplog):
     assert bajar_gld(cfg, HttpFalso(corto)) == 0   # nada nuevo: no reescribe
 
 
+def test_fecha_repetida_en_el_csv_se_guarda_una_vez(cfg, tmp_path):
+    repetido = (b"Date,Tonnes,Total Value US$\n15-Nov-2026,850,1\n15-Nov-2026,851,2\n"
+                b"16-Nov-2026,852,3\n")
+    assert bajar_gld(cfg, HttpFalso(repetido)) == 2
+    t = pq.read_table(tmp_path / "etf" / "fuente=spdr" / "simbolo=GLD" / "completo.parquet")
+    filas = t.to_pylist()
+    assert sorted(f["fecha"] for f in filas) == [date(2026, 11, 15), date(2026, 11, 16)]
+    assert next(f for f in filas if f["fecha"] == date(2026, 11, 15))["toneladas"] == 851.0
+    # Con lo ya guardado también: la repetida nueva no entra dos veces.
+    otro = b"Date,Tonnes,Total Value US$\n17-Nov-2026,853,4\n17-Nov-2026,854,5\n"
+    assert bajar_gld(cfg, HttpFalso(otro)) == 1
+
+
 def test_error_http_y_de_red_sin_detalles(cfg):
     with pytest.raises(RuntimeError, match="HTTP 500"):
         bajar_gld(cfg, HttpFalso(estado=500))

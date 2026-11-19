@@ -144,7 +144,7 @@ America/New_York (parámetro `retraso_etf`).
 
 Columnas: `simbolo` (canónico del registro), `tipo` (split, dividendo), `fecha_ex`,
 `fecha_anuncio` (nula si la fuente no la da), `razon` (splits), `importe` y `divisa` (dividendos),
-`ts_conocido` = `fecha_anuncio` o, si falta, apertura del día ex.
+`ts_conocido` = apertura (09:30 NY) del día hábil siguiente a `fecha_anuncio` (el anuncio puede salir tras el cierre) o, si falta, apertura del día ex.
 
 ### 4.6 Crudo
 
