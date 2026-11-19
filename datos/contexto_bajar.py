@@ -14,8 +14,8 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable
 
-from datos.almacen import (borrar_fuente, leer_crudo, listar_crudos, listar_manifiestos,
-                           mover_fuente, nombre_crudo)
+from datos.almacen import (leer_crudo, listar_crudos, listar_manifiestos, mover_fuente,
+                           nombre_crudo, restaurar_fuente)
 from datos.config import Config
 from datos.contexto_conf import cargar_contexto
 from datos.fuentes import calendario_api, cftc, forexfactory, fred, spdr
@@ -129,22 +129,26 @@ class ResultadoReprocesar:
     crudos: int = 0
     filas: int = 0
     fallidos: list[str] = field(default_factory=list)
+    restaurado: bool = False   # True: algo falló y el almacén quedó como estaba antes
 
 
 def reprocesar(cfg: Config, fuentes: list[str] | None = None) -> ResultadoReprocesar:
     """Rehace los Parquet de contexto de `fuentes` (todas si es None) desde sus crudos, sin red.
 
     Solo se tocan los tipos de cada fuente (nunca ticks, M1 ni otras fuentes). Lo anterior se
-    aparta en `_respaldo/` y se borra al terminar; si algo se interrumpe, se devuelve tal cual.
-    Un crudo que no se puede procesar se salta y se anota (igual que falló al bajarlo).
+    aparta en `_respaldo/` y se borra al terminar bien. Si algo se interrumpe o algún crudo no se
+    puede procesar, se devuelve todo lo apartado tal cual (`restaurado`) y se listan los fallidos.
     """
     raiz = Path(cfg.data_dir)
     fuentes = list(fuentes or FUENTES_CRUDO)
     objetivos = sorted({(tipo, f) for f in fuentes for tipo in _PROCESADORES[f][1]})
     respaldo = raiz / "_respaldo" / f"reprocesar-{datetime.now(timezone.utc):%Y%m%dT%H%M%S%f}"
-    apartados = [(t, f) for t, f in objetivos if mover_fuente(raiz, respaldo, t, f)]
     res = ResultadoReprocesar()
+    procesando = False
     try:
+        for tipo, f in objetivos:
+            mover_fuente(raiz, respaldo, tipo, f)
+        procesando = True
         crudos = sorted((m for f in fuentes for m in listar_crudos(raiz, f)), key=_orden_crudo)
         for m in crudos:
             if nombre_crudo(m).startswith(PREFIJO_PRUEBA):
@@ -153,18 +157,28 @@ def reprocesar(cfg: Config, fuentes: list[str] | None = None) -> ResultadoReproc
             try:
                 res.filas += procesar(cfg, leer_crudo(raiz, m.ruta), m)
                 res.crudos += 1
-            except Exception as e:  # noqa: BLE001 - seguimos con los demás crudos
+            except Exception as e:  # noqa: BLE001 - seguimos para listar todos los que fallan
                 res.fallidos.append(f"{m.ruta} ({_sin_claves(cfg, str(e))})")
     except BaseException:
-        # Se devuelve lo apartado tal como estaba (también con Ctrl+C).
-        for tipo, f in objetivos:
-            borrar_fuente(raiz, tipo, f)
-        for tipo, f in apartados:
-            mover_fuente(respaldo, raiz, tipo, f)
-        shutil.rmtree(respaldo, ignore_errors=True)
+        # Se devuelve lo apartado tal como estaba (también con Ctrl+C o si apartar falló a medias).
+        _restaurar(raiz, respaldo, objetivos, procesando)
         raise
+    if res.fallidos:
+        # Con un crudo fallido el resultado quedaría incompleto: se deja todo como estaba.
+        _restaurar(raiz, respaldo, objetivos, True)
+        res.restaurado = True
+    _limpiar_respaldo(raiz, respaldo)
+    return res
+
+
+def _restaurar(raiz: Path, respaldo: Path, objetivos, borrar_nuevo: bool) -> None:
+    for tipo, f in objetivos:
+        restaurar_fuente(respaldo, raiz, tipo, f, borrar_nuevo)
+    _limpiar_respaldo(raiz, respaldo)
+
+
+def _limpiar_respaldo(raiz: Path, respaldo: Path) -> None:
     shutil.rmtree(respaldo, ignore_errors=True)
     carpeta = raiz / "_respaldo"
     if carpeta.is_dir() and not any(carpeta.iterdir()):
         carpeta.rmdir()
-    return res

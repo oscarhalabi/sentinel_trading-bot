@@ -245,3 +245,60 @@ def test_catalogo_sin_conexion_sale_1(cfg, registro, monkeypatch, capsys):
     assert main(["contexto", "bajar", "gld"], ruta=registro, config=cfg, http=http) == 1
     err = capsys.readouterr().err
     assert "catálogo" in err and "secreto" not in err and http.urls == []
+
+
+def _bytes(raiz: Path) -> dict:
+    """Contenido de todos los archivos de datos y manifiestos (sin crudos)."""
+    return {p.relative_to(raiz).as_posix(): p.read_bytes() for p in sorted(raiz.rglob("*"))
+            if p.is_file() and "crudo" not in p.relative_to(raiz).parts}
+
+
+def test_reprocesar_con_un_crudo_fallido_deja_todo_como_estaba(cfg, monkeypatch, capsys):
+    import datos.fuentes.fred as fred_mod
+    from datos.contexto_conf import cargar_contexto
+
+    raiz = Path(cfg.data_dir)
+    bajar_series(cfg, HttpFalso(respuestas()), ids=["PAYEMS", "DGS10"])
+    antes = _bytes(raiz)
+    assert "serie/fuente=alfred/simbolo=PAYEMS/completo.parquet" in antes
+    ctx = cargar_contexto()
+    sin_payems = {**ctx, "series_alfred": [s for s in ctx["series_alfred"] if s["id"] != "PAYEMS"]}
+    monkeypatch.setattr(fred_mod, "cargar_contexto", lambda: sin_payems)
+    assert main(["contexto", "reprocesar"], config=cfg) == 1
+    salida = capsys.readouterr().out
+    assert "alfred_PAYEMS" in salida and "como estaba" in salida
+    assert _bytes(raiz) == antes
+    assert not (raiz / "_respaldo").exists()
+
+
+def test_reprocesar_si_apartar_falla_devuelve_lo_apartado(cfg, monkeypatch):
+    import datos.contexto_bajar as cb
+
+    raiz = Path(cfg.data_dir)
+    _bajar_todo(cfg)
+    antes = _bytes(raiz)
+    real = cb.mover_fuente
+
+    def mover(desde, hacia, tipo, fuente):
+        if tipo == "corporativo":
+            raise PermissionError("archivo bloqueado")
+        return real(desde, hacia, tipo, fuente)
+
+    monkeypatch.setattr(cb, "mover_fuente", mover)
+    with pytest.raises(PermissionError):
+        cb.reprocesar(cfg, ["fmp"])
+    assert _bytes(raiz) == antes   # el calendario de fmp, ya apartado, vuelve intacto
+    assert not (raiz / "_respaldo").exists()
+
+
+def test_restaurar_con_apartado_a_medias_no_borra_lo_no_movido(tmp_path):
+    from datos.almacen import restaurar_fuente
+
+    raiz, resp = tmp_path / "raiz", tmp_path / "resp"
+    (resp / "serie/fuente=alfred").mkdir(parents=True)            # Parquet ya apartados
+    (resp / "serie/fuente=alfred/a.parquet").write_bytes(b"p")
+    (raiz / "_manifiestos/serie/fuente=alfred").mkdir(parents=True)  # manifiestos sin mover
+    (raiz / "_manifiestos/serie/fuente=alfred/a.json").write_bytes(b"m")
+    restaurar_fuente(resp, raiz, "serie", "alfred", borrar_nuevo=False)
+    assert (raiz / "serie/fuente=alfred/a.parquet").read_bytes() == b"p"
+    assert (raiz / "_manifiestos/serie/fuente=alfred/a.json").read_bytes() == b"m"

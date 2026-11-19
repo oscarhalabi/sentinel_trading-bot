@@ -429,6 +429,23 @@ def mover_fuente(desde: Path, hacia: Path, tipo: str, fuente: str) -> bool:
     return movido
 
 
+def restaurar_fuente(respaldo: Path, raiz: Path, tipo: str, fuente: str,
+                     borrar_nuevo: bool) -> None:
+    """Devuelve a `raiz` lo que `mover_fuente` apartó en `respaldo`, carpeta por carpeta (también
+    si el apartado quedó a medias). Lo que haya en `raiz` en su lugar se borra antes. Una carpeta
+    que no llegó a apartarse se deja como está, salvo con `borrar_nuevo` (ya se estaba
+    reprocesando: lo que hay en `raiz` es nuevo y se borra)."""
+    for original, apartado in zip(_carpetas_fuente(raiz, tipo, fuente),
+                                  _carpetas_fuente(respaldo, tipo, fuente)):
+        if apartado.exists():
+            if original.exists():
+                shutil.rmtree(original)
+            original.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(apartado), str(original))
+        elif borrar_nuevo and original.exists():
+            shutil.rmtree(original)
+
+
 def borrar_fuente(raiz: Path, tipo: str, fuente: str) -> None:
     """Borra los Parquet y manifiestos de un tipo y fuente (nunca los crudos)."""
     if tipo == "crudo":

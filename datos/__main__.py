@@ -346,9 +346,13 @@ def _contexto_reprocesar(args, cfg) -> int:
 
     fuente = ALIAS_CRUDO.get(args.fuente, args.fuente)
     res = reprocesar(cfg, [fuente] if fuente else None)
-    print(f"Reprocesados {res.crudos} crudos ({res.filas} filas).")
     for f in res.fallidos:
         print(f"  No se pudo procesar: {f}")
+    if res.restaurado:
+        print(f"Fallaron {len(res.fallidos)} crudos: no se cambió nada, el almacén quedó "
+              "como estaba.")
+    else:
+        print(f"Reprocesados {res.crudos} crudos ({res.filas} filas).")
     if cfg.pg_dsn:
         print("Si usas el catálogo, ponlo al día con: python -m datos catalogo reconstruir")
     return 1 if res.fallidos else 0
