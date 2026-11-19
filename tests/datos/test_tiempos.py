@@ -140,6 +140,22 @@ def test_cot_viernes_y_excepcion():
     assert publicacion_cot(date(2024, 11, 26), "disaggregated", cot) == (utc(2024, 12, 2, 20, 30), False)
 
 
+def test_cot_semana_con_festivo_pasa_al_siguiente_habil():
+    sin_excepciones = {"excepciones_publicacion": {}, "primera_publicacion": {}}
+    # Acción de Gracias (jueves 2024-11-28): del informe del martes 26 → lunes 2024-12-02.
+    assert publicacion_cot(date(2024, 11, 26), "legacy", sin_excepciones) == \
+        (utc(2024, 12, 2, 20, 30), False)
+    # Semana sin festivo: el viernes de siempre.
+    assert publicacion_cot(date(2024, 11, 19), "legacy", sin_excepciones) == \
+        (utc(2024, 11, 22, 20, 30), False)
+    # Festivo el propio martes (4 de julio de 2023): también se retrasa (lunes 10 de julio).
+    assert publicacion_cot(date(2023, 7, 3), "legacy", sin_excepciones) == \
+        (utc(2023, 7, 10, 19, 30), False)
+    # Una excepción configurada sigue mandando.
+    con = {"excepciones_publicacion": {"2024-11-29": "2024-11-29T15:30"}, "primera_publicacion": {}}
+    assert publicacion_cot(date(2024, 11, 26), "legacy", con) == (utc(2024, 11, 29, 20, 30), False)
+
+
 def test_cot_disaggregated_2007_publicacion_tardia():
     cot = cargar_contexto()["cot"]
     tardia = (utc(2009, 9, 4, 19, 30), True)

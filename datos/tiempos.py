@@ -107,7 +107,9 @@ def publicacion_cot(fecha_informe: date, informe: str, cot_conf: dict) -> tuple[
 
     Normal: viernes de esa semana a las 15:30 NY, o la excepción de
     `cot_conf['excepciones_publicacion']` (clave: el viernes normal; valor: 'AAAA-MM-DDTHH:MM'
-    en hora de NY). Si el informe es anterior a su primera publicación (Disaggregated y TFF
+    en hora de NY). Sin excepción, si de martes a viernes de esa semana hay un festivo federal
+    de EE. UU., se da por publicado el siguiente día hábil después del viernes a las 15:30 NY
+    (prudente: la CFTC suele retrasarlo uno o varios días). Si el informe es anterior a su primera publicación (Disaggregated y TFF
     empezaron el 2009-09-04), se conoce ese día a las 15:30 y es tardía.
     """
     if fecha_informe.weekday() >= 5:
@@ -118,7 +120,11 @@ def publicacion_cot(fecha_informe: date, informe: str, cot_conf: dict) -> tuple[
         local = datetime.strptime(excepcion, "%Y-%m-%dT%H:%M")
         normal = local_a_utc(local.date(), local.strftime("%H:%M"), ZONA_NY)
     else:
-        normal = local_a_utc(viernes, HORA_COT, ZONA_NY)
+        martes = viernes - timedelta(days=3)
+        festivo = any(d.weekday() < 5 and not es_habil_eeuu(d)
+                      for d in (martes + timedelta(days=k) for k in range(4)))
+        dia_pub = _habil_desde(viernes + timedelta(days=1)) if festivo else viernes
+        normal = local_a_utc(dia_pub, HORA_COT, ZONA_NY)
     primera = cot_conf.get("primera_publicacion", {}).get(informe)
     if primera and fecha_informe < date.fromisoformat(primera):
         tardia = local_a_utc(date.fromisoformat(primera), HORA_COT, ZONA_NY)

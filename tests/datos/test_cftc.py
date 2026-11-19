@@ -19,8 +19,8 @@ LEGACY = (
     "Market and Exchange Names,As of Date in Form YYYY-MM-DD,CFTC Contract Market Code,"
     "Open Interest (All),Noncommercial Positions-Long (All),Noncommercial Positions-Short (All),"
     "Commercial Positions-Long (All),Commercial Positions-Short (All)\n"
-    '"GOLD - COMEX",2026-11-10,088691,500000,200000,50000,100000,300000\n'
-    '"OTRO - X",2026-11-10,999999,10,1,1,1,1\n'
+    '"GOLD - COMEX",2026-11-03,088691,500000,200000,50000,100000,300000\n'
+    '"OTRO - X",2026-11-03,999999,10,1,1,1,1\n'
 )
 DISAGG = (
     "Market_and_Exchange_Names,Report_Date_as_YYYY-MM-DD,CFTC_Contract_Market_Code,"
@@ -30,7 +30,7 @@ DISAGG = (
 TFF = (
     "Market_and_Exchange_Names,Report_Date_as_YYYY-MM-DD,CFTC_Contract_Market_Code,"
     "Open_Interest_All,Lev_Money_Positions_Long_All,Lev_Money_Positions_Short_All\n"
-    '"EURO FX",2026-11-10,099741,700000,60000,90000\n'
+    '"EURO FX",2026-11-03,099741,700000,60000,90000\n'
 )
 
 
@@ -48,8 +48,8 @@ def valores(tabla):
 def test_cot_viernes():
     v = valores(normalizar_cot(LEGACY.encode(), "legacy", COT, T0))
     f = v[("ORO", "no_comerciales_largos")]
-    assert f["valor"] == 200000.0 and f["fecha_informe"] == date(2026, 11, 10)
-    assert f["ts_conocido"] == datetime(2026, 11, 13, 20, 30, tzinfo=timezone.utc)  # vie 15:30 NY
+    assert f["valor"] == 200000.0 and f["fecha_informe"] == date(2026, 11, 3)
+    assert f["ts_conocido"] == datetime(2026, 11, 6, 20, 30, tzinfo=timezone.utc)  # vie 15:30 NY
     assert f["ts_version"] == T0 and f["publicacion_tardia"] is False
     assert ("ORO", "interes_abierto") in v and ("ORO", "comerciales_cortos") in v
     assert ("ORO", "gestores_largos") not in v   # legacy no tiene ese campo
@@ -91,11 +91,11 @@ class HttpFalso:
 def http_con(legacy=LEGACY):
     return HttpFalso({
         URLS_COT["legacy"].format(anio=2026): zip_de(legacy),
-        URLS_COT["disaggregated"].format(anio=2026): zip_de(DISAGG.replace("2008-12-30", "2026-11-10")),
+        URLS_COT["disaggregated"].format(anio=2026): zip_de(DISAGG.replace("2008-12-30", "2026-11-03")),
         URLS_COT["tff"].format(anio=2026): zip_de(TFF),
-        URLS_COT["legacy"].format(anio=2025): zip_de(LEGACY.replace("2026-11-10", "2025-11-11")),
+        URLS_COT["legacy"].format(anio=2025): zip_de(LEGACY.replace("2026-11-03", "2025-11-11")),
         URLS_COT["disaggregated"].format(anio=2025): zip_de(DISAGG.replace("2008-12-30", "2025-11-11")),
-        URLS_COT["tff"].format(anio=2025): zip_de(TFF.replace("2026-11-10", "2025-11-11")),
+        URLS_COT["tff"].format(anio=2025): zip_de(TFF.replace("2026-11-03", "2025-11-11")),
     })
 
 
@@ -124,14 +124,14 @@ def test_cot_correccion_crea_version(cfg):
     filas = [f for f in leer(cfg, "ORO", 2026) if f["campo"] == "no_comerciales_largos"]
     assert sorted(f["valor"] for f in filas) == [200000.0, 210000.0]
     # La primera carga del año vale desde su publicación; la corrección, desde su descarga.
-    publicado = datetime(2026, 11, 13, 20, 30, tzinfo=timezone.utc)
+    publicado = datetime(2026, 11, 6, 20, 30, tzinfo=timezone.utc)
     assert sorted(f["ts_version"] for f in filas) == [publicado, t1]
 
 
 def test_primera_vez_ts_version_es_ts_conocido(cfg):
     bajar_cot(cfg, anios=[2026], http=HttpFalso({
         URLS_COT["legacy"].format(anio=2026): zip_de(LEGACY),
-        URLS_COT["disaggregated"].format(anio=2026): zip_de(DISAGG.replace("2008-12-30", "2026-11-10")),
+        URLS_COT["disaggregated"].format(anio=2026): zip_de(DISAGG.replace("2008-12-30", "2026-11-03")),
         URLS_COT["tff"].format(anio=2026): zip_de(TFF)}), ahora=T0, primera_vez=True)
     for f in leer(cfg, "ORO", 2026):
         assert f["ts_version"] == f["ts_conocido"]
@@ -171,7 +171,7 @@ def test_almacen_vacio_baja_toda_la_historia(cfg):
 
 
 def test_correccion_tras_carga_completa_lleva_ts_descarga(cfg):
-    cuerpos = {"legacy": LEGACY, "disaggregated": DISAGG.replace("2008-12-30", "2026-11-10"),
+    cuerpos = {"legacy": LEGACY, "disaggregated": DISAGG.replace("2008-12-30", "2026-11-03"),
                "tff": TFF}
     bajar_cot(cfg, http=HttpPorInforme(cuerpos), ahora=T0)   # primera vez automática
     antes = leer(cfg, "ORO", 2026)
@@ -203,9 +203,9 @@ DISAGG_2006 = DISAGG.replace("2008-12-30", "2006-06-13")
 
 
 def _http_2006():
-    return HttpPorInforme({"legacy": LEGACY.replace("2026-11-10", "2006-06-13"),
+    return HttpPorInforme({"legacy": LEGACY.replace("2026-11-03", "2006-06-13"),
                            "disaggregated": DISAGG_2006,
-                           "tff": TFF.replace("2026-11-10", "2006-06-13")})
+                           "tff": TFF.replace("2026-11-03", "2006-06-13")})
 
 
 def _visible_2006(cfg):
