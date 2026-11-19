@@ -127,3 +127,12 @@ def test_prueba_error_de_api_va_al_informe(tmp_path):
     assert res["fmp"].errores and "429" in res["fmp"].errores[0]
     texto = ruta.read_text(encoding="utf-8")
     assert "429" in texto and "CLAVE_FMP_X" not in texto
+
+
+def test_rangos_solapados_prueban_cada_mes_una_vez(tmp_path):
+    # Con los crudos que nunca se reemplazan, un mes repetido no debe romper la prueba.
+    cfg = config(tmp_path, **CLAVES)
+    rangos = [(date(2024, 1, 1), date(2024, 1, 31)), (date(2024, 1, 10), date(2024, 1, 20))]
+    _, res = probar_calendario(cfg, ["fmp"], rangos, http=HttpFalso(), hoy=HOY)
+    assert not res["fmp"].errores
+    assert len([m for m in listar_crudos(tmp_path, "fmp")]) == 1

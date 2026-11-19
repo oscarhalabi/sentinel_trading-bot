@@ -141,6 +141,8 @@ def _probar_fuente(cfg: Config, nombre: str, rangos: list[tuple[date, date]],
     for desde, hasta in rangos:
         for ini, fin in _meses(desde, hasta):
             mes = f"{ini:%Y-%m}"
+            if mes in res.filas:   # rangos solapados: cada mes se prueba una sola vez
+                continue
             res.filas[mes] = 0
             try:
                 paginas = src.paginas_eventos(ini, fin)
