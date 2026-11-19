@@ -146,8 +146,13 @@ def _mezclar(raiz: Path, nuevas: pd.DataFrame, mercado: str, anio: int, ts_versi
     agregadas = res.iloc[len(previas):].copy()
     if agregadas.empty:
         return {}
-    if primera_vez:   # carga histórica: la versión no puede ser anterior a la publicación
-        res.loc[agregadas.index, "ts_version"] = agregadas["ts_conocido"]
+    if primera_vez:
+        # Carga histórica: una clave vista por primera vez no puede tener versión anterior a su
+        # publicación. Las correcciones de claves ya guardadas siempre llevan ts_descarga.
+        vistas = set(zip(*(previas[c] for c in CLAVE)))
+        nuevas_claves = [k not in vistas for k in zip(*(agregadas[c] for c in CLAVE))]
+        idx = agregadas.index[nuevas_claves]
+        res.loc[idx, "ts_version"] = agregadas.loc[idx, "ts_conocido"]
     tabla = pa.Table.from_pandas(res[ESQUEMA_COT.names], schema=ESQUEMA_COT, preserve_index=False)
     escribir(raiz, tabla, "cot", "cftc", mercado, periodo)
     return agregadas.groupby("informe").size().to_dict()
@@ -157,13 +162,17 @@ def bajar_cot(cfg: Config, anios: list[int] | None = None, http: ClienteHttp | N
               ahora: datetime | None = None, primera_vez: bool = False) -> dict[str, int]:
     """Baja los zips de la CFTC, guarda el crudo y mezcla. Devuelve {informe: filas_nuevas}.
 
-    Por defecto el año actual y el anterior; con `primera_vez` toda la historia (legacy desde
-    1986, disaggregated y tff desde 2006) y `ts_version` = `ts_conocido`.
+    Por defecto el año actual y el anterior. Si `anios` es None y aún no hay datos de la CFTC
+    guardados, es la primera vez y se baja toda la historia (legacy desde 1986, disaggregated y
+    tff desde 2006). `primera_vez=True` fuerza ese rango aunque ya haya datos. En una primera
+    vez, las claves nuevas llevan `ts_version` = `ts_conocido`; las correcciones, `ts_descarga`.
     """
     ahora = (ahora or datetime.now(timezone.utc)).astimezone(timezone.utc)
     http = http or ClienteRequests()
     raiz = Path(cfg.data_dir)
     cot_conf = cargar_contexto()["cot"]
+    if anios is None and not primera_vez:
+        primera_vez = not any((raiz / "cot" / "fuente=cftc").glob("simbolo=*/*.parquet"))
     actual = ahora.year
     cuenta = {informe: 0 for informe in URLS_COT}
     tablas, desconocidos = [], {}

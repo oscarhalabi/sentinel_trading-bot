@@ -105,9 +105,10 @@ def leer(cfg, mercado, anio):
 
 
 def test_bajar_cot_por_defecto_dos_anios(cfg):
+    bajar_cot(cfg, anios=[2026], http=http_con(), ahora=T0)   # ya hay datos: no es primera vez
     h = http_con()
     res = bajar_cot(cfg, http=h, ahora=T0)
-    assert res == {"legacy": 10, "disaggregated": 6, "tff": 6}
+    assert res == {"legacy": 5, "disaggregated": 3, "tff": 3}   # solo lo de 2025
     assert len(h.pedidas) == 6
     assert {f["informe"] for f in leer(cfg, "ORO", 2026)} == {"legacy", "disaggregated"}
     assert leer(cfg, "ORO", 2025)
@@ -134,11 +135,55 @@ def test_primera_vez_ts_version_es_ts_conocido(cfg):
         assert f["ts_version"] == f["ts_conocido"]
 
 
-def test_primera_vez_anios_desde_1986_y_2006(cfg):
-    h = HttpFalso({})
-    with pytest.raises(RuntimeError) as e:
-        bajar_cot(cfg, http=h, ahora=T0, primera_vez=True)
-    assert "deacot1986.zip" in str(e.value)
+class HttpPorInforme:
+    """Responde igual para cualquier año; guarda las URLs pedidas."""
+    def __init__(self, cuerpos):
+        self.cuerpos, self.pedidas = cuerpos, []
+
+    def get(self, url, timeout, headers=None):
+        self.pedidas.append(url)
+        for informe, plantilla in URLS_COT.items():
+            if url.startswith(plantilla.split("{")[0]):
+                return 200, zip_de(self.cuerpos[informe])
+        return 404, b""
+
+
+def anios_pedidos(h):
+    res = {}
+    for url in h.pedidas:
+        for informe, plantilla in URLS_COT.items():
+            pref = plantilla.split("{")[0]
+            if url.startswith(pref) and url.endswith(".zip"):
+                res.setdefault(informe, []).append(int(url[len(pref):-4]))
+    return res
+
+
+def test_almacen_vacio_baja_toda_la_historia(cfg):
+    vacios = {"legacy": LEGACY.split("\n")[0] + "\n",
+              "disaggregated": DISAGG.split("\n")[0] + "\n", "tff": TFF.split("\n")[0] + "\n"}
+    h = HttpPorInforme(vacios)
+    bajar_cot(cfg, http=h, ahora=T0)
+    a = anios_pedidos(h)
+    assert a["legacy"] == list(range(1986, 2027))
+    assert a["disaggregated"] == list(range(2006, 2027)) and a["tff"] == a["disaggregated"]
+
+
+def test_correccion_tras_carga_completa_lleva_ts_descarga(cfg):
+    cuerpos = {"legacy": LEGACY, "disaggregated": DISAGG.replace("2008-12-30", "2026-11-10"),
+               "tff": TFF}
+    bajar_cot(cfg, http=HttpPorInforme(cuerpos), ahora=T0)   # primera vez automática
+    antes = leer(cfg, "ORO", 2026)
+    assert all(f["ts_version"] == f["ts_conocido"] for f in antes)
+    t1 = datetime(2026, 11, 25, 12, 0, tzinfo=timezone.utc)
+    cuerpos["legacy"] = LEGACY.replace("200000,50000", "210000,50000")
+    res = bajar_cot(cfg, http=HttpPorInforme(cuerpos), ahora=t1, primera_vez=True)
+    assert res["legacy"] == 1
+    filas = [f for f in leer(cfg, "ORO", 2026) if f["campo"] == "no_comerciales_largos"]
+    nueva = next(f for f in filas if f["valor"] == 210000.0)
+    assert nueva["ts_version"] == t1
+    todas = leer(cfg, "ORO", 2026)
+    claves = [(f["informe"], f["fecha_informe"], f["campo"], f["ts_version"]) for f in todas]
+    assert len(claves) == len(set(claves))
 
 
 def test_error_de_red_sin_detalles(cfg):
