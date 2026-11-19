@@ -123,7 +123,9 @@ def test_cot_correccion_crea_version(cfg):
     assert res["legacy"] == 1
     filas = [f for f in leer(cfg, "ORO", 2026) if f["campo"] == "no_comerciales_largos"]
     assert sorted(f["valor"] for f in filas) == [200000.0, 210000.0]
-    assert sorted(f["ts_version"] for f in filas) == [T0, t1]
+    # La primera carga del año vale desde su publicación; la corrección, desde su descarga.
+    publicado = datetime(2026, 11, 13, 20, 30, tzinfo=timezone.utc)
+    assert sorted(f["ts_version"] for f in filas) == [publicado, t1]
 
 
 def test_primera_vez_ts_version_es_ts_conocido(cfg):
@@ -193,3 +195,63 @@ def test_error_de_red_sin_detalles(cfg):
     with pytest.raises(RuntimeError) as e:
         bajar_cot(cfg, anios=[2026], http=Malo(), ahora=T0)
     assert "SECRETA" not in str(e.value) and "deacot2026.zip" in str(e.value)
+
+
+# --- I2: "primera vez" por (mercado, informe, año), no por la forma de lanzar la carga -------
+
+DISAGG_2006 = DISAGG.replace("2008-12-30", "2006-06-13")
+
+
+def _http_2006():
+    return HttpPorInforme({"legacy": LEGACY.replace("2026-11-10", "2006-06-13"),
+                           "disaggregated": DISAGG_2006,
+                           "tff": TFF.replace("2026-11-10", "2006-06-13")})
+
+
+def _visible_2006(cfg):
+    from datos.consulta import contexto
+    r = contexto("cot", date(2006, 1, 1), date(2007, 1, 1), conocido_en=date(2006, 6, 30), cfg=cfg)
+    return r
+
+
+def test_desde_con_almacen_vacio_historial_visible(cfg):
+    from datos.contexto_bajar import bajar_contexto
+    t = datetime(2026, 11, 18, 12, tzinfo=timezone.utc)
+    res = bajar_contexto(cfg, ["cot"], [], desde=date(2006, 1, 1), http=_http_2006(),
+                         hoy=t.date())
+    assert not res.fallos
+    r = _visible_2006(cfg)
+    assert set(r["informe"]) == {"legacy"}   # Disaggregated/TFF de 2006: tardíos (2009-09-04)
+    assert (r["ts_version"] == r["ts_conocido"]).all()
+    assert len(r) == 5
+
+
+def test_carga_cortada_y_relanzada_historial_visible(cfg):
+    class Cortada(HttpPorInforme):
+        def get(self, url, timeout, headers=None):
+            if "2010" in url:
+                raise ConnectionError("cortada")
+            return super().get(url, timeout, headers)
+    h = Cortada(_http_2006().cuerpos)
+    with pytest.raises(RuntimeError):
+        bajar_cot(cfg, anios=list(range(2006, 2012)), http=h, ahora=T0)
+    bajar_cot(cfg, anios=list(range(2006, 2012)), http=_http_2006(), ahora=T0)
+    r = _visible_2006(cfg)
+    assert len(r) == 5 and (r["ts_version"] == r["ts_conocido"]).all()
+
+
+def test_reprocesar_cot_da_lo_mismo(cfg):
+    from datos.contexto_bajar import reprocesar
+    bajar_cot(cfg, anios=[2006], http=_http_2006(), ahora=T0)
+    corregido = _http_2006()
+    corregido.cuerpos["legacy"] = corregido.cuerpos["legacy"].replace("200000,50000",
+                                                                       "210000,50000")
+    t1 = datetime(2026, 11, 25, 12, 0, tzinfo=timezone.utc)
+    bajar_cot(cfg, anios=[2006], http=corregido, ahora=t1)
+    antes = sorted(map(str, leer(cfg, "ORO", 2006)))
+    r = reprocesar(cfg, ["cftc"])
+    assert not r.fallidos
+    assert sorted(map(str, leer(cfg, "ORO", 2006))) == antes
+    filas = [f for f in leer(cfg, "ORO", 2006) if f["campo"] == "no_comerciales_largos"]
+    assert sorted(f["ts_version"] for f in filas)[1] == t1
+    assert len(_visible_2006(cfg)) == 5

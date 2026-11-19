@@ -32,7 +32,8 @@ URLS_COT = {
 }
 PRIMER_ANIO = {"legacy": 1986, "disaggregated": 2006, "tff": 2006}
 TIMEOUT = 120.0
-# Nombre del crudo: <informe>_<año>, con _primera si era la carga histórica.
+# Nombre del crudo: <informe>_<año>. Los crudos viejos pueden llevar `_primera` al final: se
+# acepta pero ya no hace falta (la "primera vez" se decide con lo guardado).
 _RE_CRUDO = re.compile(r"^(?P<informe>legacy|disaggregated|tff)_\d{4}(?P<primera>_primera)?$")
 CLAVE = ["mercado", "informe", "fecha_informe", "campo"]
 
@@ -137,9 +138,15 @@ def _descargar(http: ClienteHttp, url: str) -> bytes:
     return cuerpo
 
 
-def _mezclar(raiz: Path, nuevas: pd.DataFrame, mercado: str, anio: int, ts_version: datetime,
-             primera_vez: bool) -> dict[str, int]:
-    """Mezcla las filas de un mercado y año con lo guardado. Devuelve filas nuevas por informe."""
+def _mezclar(raiz: Path, nuevas: pd.DataFrame, mercado: str, anio: int,
+             ts_version: datetime) -> dict[str, int]:
+    """Mezcla las filas de un mercado y año con lo guardado. Devuelve filas nuevas por informe.
+
+    Primera vez de un (mercado, informe, año) = no había ninguna fila suya guardada: esas filas
+    valen desde su publicación (`ts_version = ts_conocido`), sea la carga completa, con `--desde`,
+    una carga cortada y relanzada o `reprocesar`. Lo que llega después (correcciones o semanas
+    nuevas de un año ya guardado) lleva `ts_version` = hora de descarga.
+    """
     periodo = date(anio, 1, 1)
     ruta = raiz / ruta_relativa("cot", "cftc", mercado, periodo)
     previas = (pq.read_table(ruta).to_pandas() if ruta.exists()
@@ -149,20 +156,15 @@ def _mezclar(raiz: Path, nuevas: pd.DataFrame, mercado: str, anio: int, ts_versi
     agregadas = res.iloc[len(previas):].copy()
     if agregadas.empty:
         return {}
-    if primera_vez:
-        # Carga histórica: una clave vista por primera vez no puede tener versión anterior a su
-        # publicación. Las correcciones de claves ya guardadas siempre llevan ts_descarga.
-        vistas = set(zip(*(previas[c] for c in CLAVE)))
-        nuevas_claves = [k not in vistas for k in zip(*(agregadas[c] for c in CLAVE))]
-        idx = agregadas.index[nuevas_claves]
-        res.loc[idx, "ts_version"] = agregadas.loc[idx, "ts_conocido"]
+    informes_guardados = set(previas["informe"])
+    idx = agregadas.index[~agregadas["informe"].isin(informes_guardados)]
+    res.loc[idx, "ts_version"] = agregadas.loc[idx, "ts_conocido"]
     tabla = pa.Table.from_pandas(res[ESQUEMA_COT.names], schema=ESQUEMA_COT, preserve_index=False)
     escribir(raiz, tabla, "cot", "cftc", mercado, periodo)
     return agregadas.groupby("informe").size().to_dict()
 
 
-def _procesar(raiz: Path, cuerpo: bytes, informe: str, ts: datetime,
-              primera_vez: bool) -> dict[str, int]:
+def _procesar(raiz: Path, cuerpo: bytes, informe: str, ts: datetime) -> dict[str, int]:
     """Normaliza un zip de un informe y lo mezcla por mercado y año. Devuelve {informe: filas}."""
     filas, desconocidos = _normalizar_filas(_texto_del_zip(cuerpo), informe,
                                             cargar_contexto()["cot"], ts)
@@ -175,20 +177,19 @@ def _procesar(raiz: Path, cuerpo: bytes, informe: str, ts: datetime,
     df["_anio"] = [f.year for f in df["fecha_informe"]]
     for (mercado, anio), grupo in df.groupby(["mercado", "_anio"]):
         for inf, n in _mezclar(raiz, grupo.drop(columns="_anio"), mercado, int(anio),
-                               ts, primera_vez).items():
+                               ts).items():
             cuenta[inf] = cuenta.get(inf, 0) + n
     return cuenta
 
 
 def procesar_crudo(cfg: Config, cuerpo: bytes, meta: Manifiesto) -> int:
-    """Normaliza un zip guardado (`<informe>_<año>`, con `_primera` si era carga histórica) y lo
+    """Normaliza un zip guardado (`<informe>_<año>`; un `_primera` viejo se ignora) y lo
     mezcla. Es el mismo camino que usa la descarga en vivo; `reprocesar` lo usa sin red.
     Devuelve las filas nuevas."""
     m = _RE_CRUDO.match(nombre_crudo(meta))
     if m is None:
         raise ValueError(f"Crudo de la CFTC con nombre desconocido: {meta.ruta}")
-    cuenta = _procesar(Path(cfg.data_dir), cuerpo, m["informe"], momento_crudo(meta),
-                       bool(m["primera"]))
+    cuenta = _procesar(Path(cfg.data_dir), cuerpo, m["informe"], momento_crudo(meta))
     return sum(cuenta.values())
 
 
@@ -198,9 +199,9 @@ def bajar_cot(cfg: Config, anios: list[int] | None = None, http: ClienteHttp | N
 
     Por defecto el año actual y el anterior. Si `anios` es None y aún no hay datos de la CFTC
     guardados, es la primera vez y se baja toda la historia (legacy desde 1986, disaggregated y
-    tff desde 2006). `primera_vez=True` fuerza ese rango aunque ya haya datos. En una primera
-    vez, las claves nuevas llevan `ts_version` = `ts_conocido`; las correcciones, `ts_descarga`
-    (el crudo lleva `_primera` en el nombre para poder reprocesarlo igual).
+    tff desde 2006). `primera_vez=True` fuerza ese rango aunque ya haya datos. Las filas de un
+    (mercado, informe, año) sin nada guardado llevan `ts_version` = `ts_conocido`; lo demás,
+    `ts_descarga` (ver `_mezclar`).
     """
     ahora = (ahora or datetime.now(timezone.utc)).astimezone(timezone.utc)
     http = http or ClienteRequests()
@@ -215,7 +216,7 @@ def bajar_cot(cfg: Config, anios: list[int] | None = None, http: ClienteHttp | N
                 else [actual - 1, actual])
         for anio in años:
             cuerpo = _descargar(http, plantilla.format(anio=anio))
-            nombre = f"{informe}_{anio}" + ("_primera" if primera_vez else "")
+            nombre = f"{informe}_{anio}"
             m = escribir_crudo(raiz, cuerpo, "cftc", nombre, ahora, "zip")
             cuenta[informe] += procesar_crudo(cfg, cuerpo, m)
     return cuenta
