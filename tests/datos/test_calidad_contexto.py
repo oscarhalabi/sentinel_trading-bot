@@ -171,3 +171,41 @@ def test_informe_tamano_por_tipo(tmp_path):
     assert "<td>serie</td>" in texto and "<td>crudo</td>" in texto
     assert "Crecimiento" in texto
     assert "secreto" not in texto
+
+
+def test_serie_semanal_no_da_hueco(tmp_path):
+    # DTWEXBGS es semanal (retraso lunes@): un dato por semana no es hueco.
+    dias = [date(2024, 5, 6), date(2024, 5, 13), date(2024, 5, 20)]
+    _serie(tmp_path, [{"periodo": d, "valor": 120.0, "ts_conocido": _t(2024, 6, 1)} for d in dias],
+           fuente="fred", sid="DTWEXBGS")
+    assert "serie_hueco" not in _tipos(verificar_contexto(_cfg(tmp_path), None))
+
+
+def test_viernes_santo_no_es_hueco_en_vixcls(tmp_path):
+    # 2024-03-29 fue Viernes Santo: la bolsa cerró y VIXCLS no tiene dato.
+    dias = [date(2024, 3, 27), date(2024, 3, 28), date(2024, 4, 1), date(2024, 4, 2)]
+    _serie(tmp_path, [{"periodo": d, "valor": 13.0, "ts_conocido": _t(2024, 6, 1)} for d in dias],
+           fuente="fred", sid="VIXCLS")
+    assert "serie_hueco" not in _tipos(verificar_contexto(_cfg(tmp_path), None))
+
+
+def test_informe_prevision_aparece_aunque_el_catalogo_ya_lo_tenga(tmp_path):
+    from datos.calidad_contexto import estadisticas_prevision_contexto
+    ev = _t(2024, 3, 8, 13, 30)
+    _guardar_calendario(tmp_path, [_evento(ev, ev - timedelta(days=7), id_fuente="x",
+                                           prevision=3.8)])
+    ff = _evento(ev, ev - timedelta(days=1), fuente="forexfactory", id_fuente=None,
+                 prevision=3.5)
+    ff["ts_foto"] = ff["ts_version"]
+    _guardar_calendario(tmp_path, [ff], fuente="forexfactory")
+
+    class CatViejo:   # todo lo anota como ya conocido: no hay problemas nuevos
+        def anotar_problema(self, *a):
+            return False
+    cfg = _cfg(tmp_path)
+    nuevos = verificar_contexto(cfg, CatViejo())
+    assert nuevos == []
+    texto = escribir_informe(cfg, nuevos, {
+        "previsiones": estadisticas_prevision_contexto(cfg)}).read_text(encoding="utf-8")
+    assert "Previsión de la API frente a Forex Factory" in texto
+    assert "<td>US_DESEMPLEO</td>" in texto and "<td>0.3</td>" in texto

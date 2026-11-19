@@ -325,14 +325,13 @@ def escribir_informe(cfg: Config, problemas: list[Problema],
                               [[t, f"{v[0] / 1e9:.3f}", f"{v[1] / 1e9:.3f}"]
                                for t, v in sorted(por_tipo.items())])
                   if por_tipo else "<p>Sin datos.</p>")
-    previsiones = [p for p in problemas if p.tipo == "prevision_api_vs_ff"]
+    previsiones = (resumen_descarga or {}).get("previsiones")
     if previsiones:
         partes.append("<h2>Previsión de la API frente a Forex Factory</h2>")
         partes.append(_tabla_html(
             ["Evento", "Fuente", "Emparejados", "Mediana |API − FF|", "p90 |API − FF|"],
-            [[p.simbolo, p.fuente, p.detalle.get("emparejados"),
-              f"{p.detalle.get('mediana', float('nan')):.4g}",
-              f"{p.detalle.get('p90', float('nan')):.4g}"] for p in previsiones]))
+            [[e["evento"], e["fuente"], e["emparejados"], f"{e['mediana']:.4g}",
+              f"{e['p90']:.4g}"] for e in previsiones]))
     partes.append("<h2>Problemas nuevos</h2>")
     if not problemas:
         partes.append("<p>Ninguno.</p>")

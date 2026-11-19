@@ -14,7 +14,8 @@ from datos.calidad import Problema
 from datos.config import Config
 from datos.consulta import (_FUENTE_FF, _clave_evento, _leer_contexto, _prevision_ff,
                             _ultima_version)
-from datos.horarios import es_habil_eeuu
+from datos.contexto_conf import cargar_contexto
+from datos.horarios import es_habil_eeuu, festivo
 from datos.prueba_calendario import EVENTO_A_ALFRED, _dato_alfred, _serie_alfred
 
 TOLERANCIA_REAL = 1e-6      # relativa, para datos "nivel" (el valor tal cual de la serie)
@@ -120,8 +121,9 @@ def _real_api_vs_alfred(cfg: Config, cal: pd.DataFrame) -> list[Problema]:
     return salida
 
 
-def _prevision_api_vs_ff(cal: pd.DataFrame) -> list[Problema]:
-    """Por evento: mediana y p90 de |previsión API − previsión FF| (emparejados a ±90 min)."""
+def estadisticas_prevision(cal: pd.DataFrame) -> list[dict]:
+    """Por evento: mediana y p90 de |previsión API − previsión FF| (emparejados a ±90 min).
+    No depende del catálogo: sirve para el informe aunque los problemas ya no sean nuevos."""
     api = cal[cal["fuente"].isin(_FUENTES_API)]
     ff = cal[cal["fuente"] == _FUENTE_FF]
     if api.empty or ff.empty:
@@ -136,12 +138,30 @@ def _prevision_api_vs_ff(cal: pd.DataFrame) -> list[Problema]:
     salida = []
     for (fuente, nombre), g in api.groupby(["fuente", "evento"]):
         dif = (g["prevision"] - g["_ff"]).abs()
-        salida.append(Problema(
-            "prevision_api_vs_ff", str(nombre), str(fuente),
-            _py(g["ts_evento"].min()), _py(g["ts_evento"].max()), "info",
-            {"emparejados": int(len(g)), "mediana": float(dif.median()),
-             "p90": float(dif.quantile(0.9))}))
+        salida.append({"evento": str(nombre), "fuente": str(fuente),
+                       "desde": _py(g["ts_evento"].min()), "hasta": _py(g["ts_evento"].max()),
+                       "emparejados": int(len(g)), "mediana": float(dif.median()),
+                       "p90": float(dif.quantile(0.9))})
     return salida
+
+
+def _prevision_api_vs_ff(estadisticas: list[dict]) -> list[Problema]:
+    return [Problema("prevision_api_vs_ff", e["evento"], e["fuente"], e["desde"], e["hasta"],
+                     "info", {"emparejados": e["emparejados"], "mediana": e["mediana"],
+                              "p90": e["p90"]}) for e in estadisticas]
+
+
+def _leer_calendario(cfg: Config, desde: date | None) -> pd.DataFrame:
+    cal = _leer_contexto(cfg, "calendario")
+    corte = _inicio(desde)
+    if corte is not None and not cal.empty:
+        cal = cal[cal["ts_evento"] >= corte]
+    return cal
+
+
+def estadisticas_prevision_contexto(cfg: Config, desde: date | None = None) -> list[dict]:
+    """Lo mismo que `estadisticas_prevision`, leyendo el calendario guardado."""
+    return estadisticas_prevision(_leer_calendario(cfg, desde))
 
 
 # --- series, ALFRED y COT -----------------------------------------------------
@@ -157,21 +177,33 @@ def chequear_alfred_fechas(serie: pd.DataFrame, sid: str) -> list[Problema]:
                      _py(malas["ts_hasta"].max()), "grave", {"versiones": int(len(malas))})]
 
 
-def chequear_huecos_serie(serie: pd.DataFrame, sid: str, fuente: str = "fred") -> list[Problema]:
-    """Días hábiles de EE. UU. sin dato entre el primero y el último, juntos en rangos."""
-    if serie.empty:
+def _esperado(dia: date) -> bool:
+    """Día con dato esperado: hábil federal (H.15) y no cerrado por la bolsa (VIXCLS)."""
+    return es_habil_eeuu(dia) and festivo("nyse", dia) != "cerrado"
+
+
+def _es_diaria(retraso: str | None) -> bool:
+    return bool(retraso) and retraso.startswith(("habil+1@", "mismo@"))
+
+
+def chequear_huecos_serie(serie: pd.DataFrame, sid: str, fuente: str = "fred",
+                          retraso: str | None = None) -> list[Problema]:
+    """Días hábiles sin dato entre el primero y el último, juntos en rangos. Solo series
+    diarias (`retraso` habil+1@ o mismo@); las demás (p. ej. semanales) no se revisan.
+    Un día cuenta si es hábil federal Y la bolsa no está cerrada (Viernes Santo)."""
+    if serie.empty or not _es_diaria(retraso):
         return []
     tiene = {pd.Timestamp(p).date() for p in serie["periodo"].dropna()}
     d, fin = min(tiene), max(tiene)
     faltan: list[date] = []
     while d <= fin:
-        if d not in tiene and es_habil_eeuu(d):
+        if d not in tiene and _esperado(d):
             faltan.append(d)
         d += timedelta(days=1)
     tramos: list[list[date]] = []
     for d in faltan:
         # contiguo si entre el último del tramo y d solo hay fines de semana o festivos
-        if tramos and all(not es_habil_eeuu(tramos[-1][-1] + timedelta(days=k))
+        if tramos and all(not _esperado(tramos[-1][-1] + timedelta(days=k))
                           for k in range(1, (d - tramos[-1][-1]).days)):
             tramos[-1].append(d)
         else:
@@ -213,22 +245,21 @@ def verificar_contexto(cfg: Config, catalogo, desde: date | None = None) -> list
     corte = _inicio(desde)
     _anotar(chequear_fotos_ff(cfg, desde))
 
-    cal = _leer_contexto(cfg, "calendario")
-    if corte is not None and not cal.empty:
-        cal = cal[cal["ts_evento"] >= corte]
+    cal = _leer_calendario(cfg, desde)
     _anotar(chequear_reprogramados(cal))
     _anotar(chequear_sin_mapear(cal))
     _anotar(_real_api_vs_alfred(cfg, cal))
-    _anotar(_prevision_api_vs_ff(cal))
+    _anotar(_prevision_api_vs_ff(estadisticas_prevision(cal)))
 
     series = _leer_contexto(cfg, "serie")
+    retrasos = {it["id"]: it["retraso"] for it in cargar_contexto()["series_fred"]}
     for (fuente, sid), g in series.groupby(["fuente", "serie"]):
         if fuente == "alfred":
             _anotar(chequear_alfred_fechas(g, sid))
         elif fuente == "fred":
             if corte is not None:
                 g = g[pd.to_datetime(g["periodo"]).dt.tz_localize("UTC") >= corte]
-            _anotar(chequear_huecos_serie(g, sid, fuente))
+            _anotar(chequear_huecos_serie(g, sid, fuente, retrasos.get(sid)))
 
     cot = _leer_contexto(cfg, "cot")
     if corte is not None and not cot.empty:
